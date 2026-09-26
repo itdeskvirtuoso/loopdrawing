@@ -56,6 +56,15 @@ How to use
      keep the workbook (import the Excel file again after a reload), and lists / tables show the first 400-500 entries -
      use the search box or the IO type tabs to find the rest.
 
+Internet link (page on Vercel, server on this PC through a free Cloudflare tunnel)
+- Once: install cloudflared (winget install --id Cloudflare.cloudflared). Deploy the repo on Vercel (preset "Other"; vercel.json
+  publishes only index.html).
+- Every time: double-click start_online.bat on the server PC. It starts the server and the tunnel and shows the link
+  https://loopdrawing.vercel.app/?server=https://<random>.trycloudflare.com (also copied to the clipboard). Open it on any device.
+  The browser remembers the tunnel address; it changes every time start_online.bat is started, so open the new link then.
+- The PC must stay on with the window open. Whoever has the link can use the server (no login): share it with the team only.
+- Only the Vercel address of this project may use the server (see ALLOWED_ORIGIN in server.py; LOOP_ORIGIN_RE for another address).
+
 Logos: pictures inside the frame DWG (OLE objects: bitmap or EMF, e.g. the company logo) are read, drawn at their place
 on the screen and in the PDF, and written back as the same OLE objects into the DWG / DXF (needs Windows for EMF pictures).
 
@@ -65,6 +74,7 @@ Files
 - tplset.py             reads template DWGs (any layout), builds a template set
 - io_excel.py           reads the IO ASSIGNMENT workbook, decides the sheets and their texts
 - dwg_export.py         makes the DWG / DXF sheets
+- online.py             server + tunnel for the Vercel page (start_online.bat)
 - build_template.py     rebuilds template sets from the command line (normally not needed)
 - source/sets/<id>/     the DWG files of every template set   (mega-epc = the original MEGA EPC templates)
 - data/sets/<id>/       built from them (blank sheet PDF / SVG / DXF + what was detected)

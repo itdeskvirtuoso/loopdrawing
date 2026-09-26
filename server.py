@@ -26,6 +26,8 @@ from io_excel import read_io_excel
 
 ROOT = Path(__file__).resolve().parent
 HOST, PORT = "127.0.0.1", 8765
+# Pages of other sites that may use this server (the Vercel site of this project; LOOP_ORIGIN_RE = another address, a regex)
+ALLOWED_ORIGIN = re.compile(os.environ.get("LOOP_ORIGIN_RE", r"https://loopdrawing[\w-]*\.vercel\.app"))
 
 A1_W, A1_H = 2383.94, 1683.78  # pt
 CAP = tplset.CAP
@@ -310,7 +312,19 @@ class Handler(SimpleHTTPRequestHandler):
 
     def end_headers(self):
         self.send_header("Cache-Control", "no-cache")
+        origin = self.headers.get("Origin", "")
+        if origin and ALLOWED_ORIGIN.fullmatch(origin):   # the page on Vercel talks to this server through the tunnel
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
         super().end_headers()
+
+    def do_OPTIONS(self):   # the browser asks before a POST with JSON from another site
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Max-Age", "600")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def do_GET(self):
         url = urlparse(self.path)

@@ -467,7 +467,7 @@
 </style>
 </head>
 <body>
-<div id="offline">The drawing server is not running. Start it with <b>start.bat</b>, then reload this page.</div>
+<div id="offline">The drawing server is not running. Start it with <b>start.bat</b>, then reload this page. On the internet link: run <b>start_online.bat</b> on the server PC and open the new link it shows.</div>
 
 <header class="appbar">
   <div class="brand">
@@ -721,6 +721,22 @@
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
+  // Where the drawing server is. Started with start.bat the page comes from the server itself (SERVER = ""). On Vercel the server
+  // runs on a PC behind a Cloudflare tunnel: start_online.bat prints the link  <this page>/?server=https://xxxx.trycloudflare.com
+  // (kept in this browser, so the next visit needs no link). Only tunnel / local addresses are accepted.
+  const SERVER = (() => {
+    const ok = (v) => /^(https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.trycloudflare\.com|http:\/\/(127\.0\.0\.1|localhost):\d+)$/i.test(v || "");
+    try {
+      const q = new URLSearchParams(location.search).get("server");
+      if (q && ok(q.replace(/\/+$/, ""))) { localStorage.setItem("loopServer", q.replace(/\/+$/, "")); history.replaceState(null, "", location.pathname); }
+      const v = localStorage.getItem("loopServer") || "";
+      return ok(v) ? v : "";
+    } catch (e) { return ""; }
+  })();
+  if (SERVER) {
+    const plainFetch = window.fetch.bind(window);
+    window.fetch = (u, o) => plainFetch(typeof u === "string" && u[0] === "/" ? SERVER + u : u, o);
+  }
   const SVGNS = "http://www.w3.org/2000/svg";
   const CAP = 0.716;            // Arial cap height / em: DXF text height is the cap height
   const MIN_CONDENSE = 0.6;     // same text fitting as the PDF / DWG
@@ -1102,7 +1118,7 @@
     const shownKey = `${TPL.id}/${x.s.template}/${TPL.builtAt}`;
     if (shownTemplate !== shownKey) {
       shownTemplate = shownKey;
-      $("bg").setAttribute("href", `data/sets/${TPL.id}/${x.s.template}.svg?v=${TPL.builtAt}`);
+      $("bg").setAttribute("href", `${SERVER ? SERVER + "/" : ""}data/sets/${TPL.id}/${x.s.template}.svg?v=${TPL.builtAt}`);
       g.innerHTML = ""; fieldInfo = {};
       for (const k of Object.keys(els)) delete els[k];
       const labels = { iop: "IOP (module part no.)", iota: "IOTA part no.", iotype: "IO type", link: "Link no.", module: "Module name", iom: "IOM number",
@@ -1579,7 +1595,7 @@
   });
   const saveAs = (href, name) => {
     const a = document.createElement("a");
-    a.href = href; a.download = name;
+    a.href = href[0] === "/" ? SERVER + href : href; a.download = name;
     document.body.append(a); a.click(); a.remove();
   };
   async function download(list, fmt, filename, global = true) {
