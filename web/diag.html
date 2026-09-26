@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loop Drawings - check</title>
+<style>
+  body { font: 15px/1.45 system-ui, sans-serif; margin: 0; padding: 16px; background: #f4f6fb; color: #16213a; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p { margin: 4px 0 12px; color: #4b5678; }
+  .row { display: flex; gap: 10px; align-items: baseline; padding: 8px 10px; margin: 6px 0; background: #fff; border-radius: 8px; border: 1px solid #dfe4f0; word-break: break-word; }
+  .row b { min-width: 22px; }
+  .ok b { color: #0a8a3a; } .bad { border-color: #e2a7a3; background: #fff4f3; } .bad b { color: #b3261e; } .wait b { color: #888; }
+  small { color: #667; display: block; }
+  a.btn { display: inline-block; margin-top: 10px; padding: 10px 16px; background: #2748d8; color: #fff; border-radius: 8px; text-decoration: none; }
+  pre { white-space: pre-wrap; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #dfe4f0; font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>Loop Drawings - phone check</h1>
+<p>This page tests what the drawing page needs. Take a screenshot of it and send it if something is red.</p>
+<div id="out"></div>
+<pre id="ua"></pre>
+<a class="btn" href="./">Open the drawing page</a>
+<script>
+const out = document.getElementById("out");
+document.getElementById("ua").textContent = navigator.userAgent + "\n" + location.href + "\nonline: " + navigator.onLine;
+function row(id, title) {
+  const d = document.createElement("div");
+  d.className = "row wait"; d.id = id; d.innerHTML = "<b>...</b><div>" + title + "<small></small></div>";
+  out.appendChild(d); return d;
+}
+function set(id, ok, note) {
+  const d = document.getElementById(id);
+  d.className = "row " + (ok ? "ok" : "bad");
+  d.querySelector("b").textContent = ok ? "OK" : "NO";
+  d.querySelector("small").textContent = note || "";
+}
+const tests = [
+  ["t1", "Drawing page reachable", async () => { const r = await fetch("./index.html", { cache: "no-store" }); if (!r.ok) throw new Error("HTTP " + r.status); return (await r.text()).length + " bytes"; }],
+  ["t2", "Script files load (JS modules)", async () => { const m = await import("./js/core/dxf.js"); if (!m.parseDxf) throw new Error("module without parseDxf"); return "ok"; }],
+  ["t3", "Whole app starts (local API)", async () => { const m = await import("./js/localapi.js"); const r = await m.handle("/api/health"); return JSON.stringify(await r.json()); }],
+  ["t4", "Template store (IndexedDB)", () => new Promise((ok, bad) => { const q = indexedDB.open("loopDiag", 1); q.onsuccess = () => { q.result.close(); indexedDB.deleteDatabase("loopDiag"); ok("ok"); }; q.onerror = () => bad(q.error || new Error("IndexedDB blocked (private mode?)")); q.onblocked = () => bad(new Error("blocked")); })],
+  ["t5", "Web workers (needed for downloads)", () => new Promise((ok, bad) => { try { const w = new Worker(URL.createObjectURL(new Blob(["postMessage(1)"], { type: "text/javascript" }))); w.onmessage = () => { w.terminate(); ok("ok"); }; w.onerror = (e) => bad(new Error(e.message || "worker error")); } catch (e) { bad(e); } })],
+  ["t6", "Module workers", () => new Promise((ok, bad) => { try { const w = new Worker(URL.createObjectURL(new Blob(["postMessage(2)"], { type: "text/javascript" })), { type: "module" }); w.onmessage = () => { w.terminate(); ok("ok"); }; w.onerror = (e) => bad(new Error(e.message || "module worker error")); } catch (e) { bad(e); } })],
+  ["t7", "WebAssembly (DWG engine)", async () => { if (typeof WebAssembly !== "object") throw new Error("no WebAssembly"); const r = await fetch("./wasm/libredwg.wasm"); if (!r.ok) throw new Error("HTTP " + r.status); const m = await WebAssembly.compile(await r.arrayBuffer()); return "compiled, " + WebAssembly.Module.exports(m).length + " exports"; }],
+  ["t8", "PNG / ZIP tools (CompressionStream)", async () => { if (typeof CompressionStream !== "function") throw new Error("not supported (old browser)"); return "ok"; }],
+  ["t9", "Save files (Blob URLs)", async () => { const u = URL.createObjectURL(new Blob(["x"])); URL.revokeObjectURL(u); return "ok"; }],
+];
+for (const [id, title] of tests) row(id, title);
+(async () => {
+  for (const [id, , fn] of tests) {
+    try { set(id, true, String(await fn())); } catch (e) { set(id, false, (e && e.message) || String(e)); }
+  }
+})();
+</script>
+</body>
+</html>

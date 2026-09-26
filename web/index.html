@@ -723,8 +723,19 @@
 <script>
 // The page talks to a small API (/api/...). It is answered inside the browser (js/localapi.js): no server is needed.
 (() => {
+  // A visible message when the page cannot start (old browser, blocked file ...) instead of an empty page
+  const fatal = (why) => {
+    let b = document.getElementById("fatal");
+    if (!b) {
+      b = document.createElement("div"); b.id = "fatal";
+      b.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:99999;background:#b3261e;color:#fff;padding:10px 14px;font:14px/1.4 system-ui,sans-serif";
+      (document.body || document.documentElement).appendChild(b);
+    }
+    b.innerHTML = "This page could not start on this device (" + String(why).replace(/</g, "&lt;").slice(0, 160) + '). <a href="diag.html" style="color:#fff;text-decoration:underline">Run the check</a>';
+  };
+  window.addEventListener("error", (e) => { if (e.message) fatal(e.message); });
   const plain = window.fetch.bind(window);
-  const api = import("./js/localapi.js").then((m) => { window.LoopApi = m; return m; });
+  const api = import("./js/localapi.js").then((m) => { window.LoopApi = m; return m; }, (e) => { fatal(e && e.message ? e.message : e); throw e; });
   window.LoopApi = { svgUrl: () => "", jobUrl: () => "" };
   window.fetch = (u, o) => (typeof u === "string" && /^\/api\//.test(u) ? api.then((m) => m.handle(u, o)) : plain(u, o));
 })();
