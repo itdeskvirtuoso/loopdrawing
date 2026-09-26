@@ -1,0 +1,2104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loop Drawings</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23132238'/><path d='M8 10h9M8 16h16M8 22h11' stroke='%23e8b64c' stroke-width='2.6' stroke-linecap='round'/></svg>">
+<style>
+  :root {
+    --bar: #0f1b2d;
+    --bg: #f3f5fa; --panel: #ffffff; --ink: #0f172a; --ink-2: #1e293b; --muted: #64748b; --faint: #94a3b8;
+    --line: #e2e8f0; --line-2: #eef2f7; --hover: #f5f7fb;
+    --accent: #2563eb; --accent-2: #1d4ed8; --accent-soft: #eef4ff; --accent-line: #c7d7fb;
+    --brand: #1e3a8a; --brand-2: #c2410c;
+    --warn: #b45309; --warn-bg: #fffbeb; --warn-line: #fde68a; --err: #dc2626; --ok: #15803d; --ok-bg: #ecfdf3; --ok-line: #bbf7d0;
+    --AI: #2563eb; --AO: #0d9488; --RTD: #7c3aed; --DI: #d97706; --DO: #dc4a12;
+    --radius: 10px;
+    --shadow-sm: 0 1px 2px rgba(15,23,42,.05);
+    --shadow: 0 1px 2px rgba(15,23,42,.04), 0 4px 14px rgba(15,23,42,.05);
+    --shadow-lg: 0 18px 44px rgba(15,23,42,.22);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 13px/1.45 "Segoe UI", system-ui, -apple-system, Arial, sans-serif; display: flex; flex-direction: column; overflow: hidden; -webkit-font-smoothing: antialiased; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  input, select { font: inherit; color: var(--ink); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .num { font-variant-numeric: tabular-nums; }
+  .spacer { flex: 1; }
+  kbd { font: 600 10px/1 "Segoe UI", sans-serif; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 2px 5px; color: var(--muted); background: #fff; }
+
+  /* ---------- app bar ---------- */
+  .appbar { height: 60px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 20px 0 14px; background: #fff; border-bottom: 1px solid var(--line); position: relative; z-index: 3; }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .mark { width: 36px; height: 36px; border-radius: 9px; background: linear-gradient(135deg, #1e3a8a, #2563eb); border: 0; display: grid; place-items: center; flex: none; box-shadow: 0 3px 10px rgba(37,99,235,.25); }
+  .brand-txt { min-width: 0; padding-left: 12px; border-left: 1px solid var(--line); }
+  .brand b { display: block; font-size: 14px; letter-spacing: .16em; text-transform: uppercase; font-weight: 800; color: var(--brand); line-height: 1.2; }
+  .brand b em { font-style: normal; color: var(--brand-2); }
+  .brand span { display: block; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 42vw; margin-top: 2px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); font-weight: 600; font-size: 12.5px; white-space: nowrap; transition: background .12s, border-color .12s, box-shadow .12s; }
+  .btn:hover:not(:disabled) { background: var(--hover); border-color: #cbd5e1; }
+  .btn svg { width: 15px; height: 15px; flex: none; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover:not(:disabled) { background: var(--accent-2); border-color: var(--accent-2); }
+  .btn.dark { background: #fff; }
+  .btn.gold { background: var(--brand); border-color: var(--brand); color: #fff; box-shadow: 0 3px 10px rgba(30,58,138,.2); }
+  .btn.gold:hover:not(:disabled) { background: #1e40af; border-color: #1e40af; }
+  .btn.sm { height: 30px; padding: 0 10px; font-size: 12px; }
+  .btn.danger { color: #b91c1c; border-color: #fecaca; background: #fff; }
+  .btn.danger:hover:not(:disabled) { background: #fef2f2; border-color: #f87171; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn.ghost { border-color: transparent; background: transparent; color: var(--accent-2); }
+  .btn.ghost:hover:not(:disabled) { background: var(--accent-soft); border-color: transparent; }
+  .icon-btn { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 7px; border: 1px solid var(--line); background: var(--panel); transition: background .12s; flex: none; }
+  .icon-btn:hover:not(:disabled) { background: var(--hover); }
+  .icon-btn.on { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent-2); }
+  .icon-btn svg { width: 15px; height: 15px; }
+
+  .live { display: none; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 600; color: var(--muted); height: 30px; padding: 0 12px; border-radius: 999px; background: var(--hover); border: 1px solid var(--line); white-space: nowrap; }
+  .live.show { display: inline-flex; }
+  .live i { width: 7px; height: 7px; border-radius: 50%; background: #9aa6b5; flex: none; }
+  .live.on { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
+  .live.on i { background: #16a34a; animation: ping 1.8s infinite; }
+  .live.wait { color: #92400e; background: var(--warn-bg); border-color: var(--warn-line); cursor: pointer; }
+  .live.wait i { background: #f59e0b; }
+  .live.wait:hover { background: #fef3c7; }
+  @keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(22,163,74,.5); } 70% { box-shadow: 0 0 0 7px rgba(22,163,74,0); } 100% { box-shadow: 0 0 0 0 rgba(22,163,74,0); } }
+
+  /* ---------- shell: menu + views ---------- */
+  .shell { flex: 1; min-height: 0; display: grid; grid-template-columns: 224px minmax(0, 1fr); }
+  body.view-draw .shell { grid-template-columns: 60px minmax(0, 1fr); }
+  .nav { background: #fff; border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 10px 12px 12px; gap: 2px; min-height: 0; overflow: auto; }
+  .nav .sec { font-size: 9.5px; font-weight: 700; letter-spacing: .14em; color: var(--faint); padding: 16px 10px 6px; text-transform: uppercase; white-space: nowrap; }
+  .nav .sec:first-child { padding-top: 8px; }
+  .nav button { display: flex; align-items: center; gap: 10px; border: 0; background: none; height: 36px; padding: 0 10px; border-radius: 8px; font-size: 12.5px; font-weight: 500; color: #334155; text-align: left; white-space: nowrap; position: relative; flex: none; }
+  .nav button svg { width: 16px; height: 16px; flex: none; color: #64748b; }
+  .nav button:hover:not(:disabled) { background: var(--hover); color: var(--ink); }
+  .nav button.active { background: var(--accent-soft); color: var(--accent-2); font-weight: 650; }
+  .nav button.active::before { content: ""; position: absolute; left: -12px; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
+  .nav button.active svg { color: var(--accent); }
+  .nav .n { margin-left: auto; font-size: 10px; font-weight: 700; background: var(--accent); color: #fff; border-radius: 999px; padding: 0 6px; line-height: 17px; min-width: 18px; text-align: center; }
+  .nav .n.g { background: var(--ok); }
+  .nav .n.w { background: #d97706; }
+  .nav .n:empty { display: none; }
+  .nav .foot { margin-top: auto; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--hover); display: flex; gap: 10px; align-items: center; min-width: 0; }
+  .nav .foot .fi { width: 30px; height: 30px; border-radius: 7px; background: #e7f6ee; color: #15803d; display: grid; place-items: center; flex: none; }
+  .nav .foot .fi svg { width: 16px; height: 16px; }
+  .nav .foot div { min-width: 0; }
+  .nav .foot b { display: block; color: var(--ink); font-size: 11.5px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nav .foot span { display: block; font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  body.view-draw .nav { padding: 10px 8px; align-items: center; }
+  body.view-draw .nav .sec, body.view-draw .nav .lbl, body.view-draw .nav .foot { display: none; }
+  body.view-draw .nav .sec + button { margin-top: 12px; }
+  body.view-draw .nav button { justify-content: center; padding: 0; width: 40px; height: 38px; }
+  body.view-draw .nav button.active::before { left: -8px; }
+  body.view-draw .nav .n { position: absolute; top: 0; right: -4px; padding: 0 4px; line-height: 14px; font-size: 9px; min-width: 14px; }
+  .views { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  body.view-draw .page, body:not(.view-draw) .layout { display: none !important; }
+
+  /* ---------- pages ---------- */
+  .page { display: none; flex: 1; min-height: 0; overflow: auto; }
+  .page.active { display: block; }
+  .page-in { padding: 22px 28px 40px; max-width: 1480px; margin: 0 auto; }
+  .page-head { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  .page-head .crumb { font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin-bottom: 4px; }
+  .page-head h2 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--ink); display: flex; align-items: center; gap: 9px; }
+  .page-head h2 svg { color: var(--accent); width: 19px; height: 19px; }
+  .page-head p { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; }
+  .page-head .right { margin-left: auto; text-align: right; font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 10px; }
+  .page-head .right b { display: block; color: var(--ink); font-size: 12.5px; font-weight: 650; }
+
+  .kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .kpi { container-type: inline-size; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-sm); transition: box-shadow .15s, border-color .15s; min-width: 0; }
+  .kpi.click { cursor: pointer; }
+  .kpi:hover { box-shadow: var(--shadow); border-color: #d5dde8; }
+  .kpi-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 16px 18px; min-height: 124px; }
+  .kpi-top { display: flex; align-items: center; gap: 10px; }
+  .kpi .ico { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: color-mix(in srgb, var(--k) 11%, white); color: var(--k); flex: none; }
+  .kpi .ico svg { width: 17px; height: 17px; }
+  .kpi label { font-size: 10.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: #475569; }
+  .kpi .v { font-size: 28px; font-weight: 700; line-height: 1.1; color: var(--ink); margin-top: 12px; letter-spacing: -.01em; }
+  .kpi .v small { font-size: 13px; color: var(--muted); font-weight: 600; margin-left: 4px; letter-spacing: 0; }
+  .kpi .s { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+  .kpi-vis { display: flex; align-items: center; justify-content: flex-end; }
+  .kpi svg.spark { display: block; width: 140px; height: 56px; }
+  .kpi svg.donut { display: block; width: 84px; height: 84px; }
+  .kpi .stack { width: 150px; display: flex; flex-direction: column; gap: 5px; }
+  .kpi .stack div { display: grid; grid-template-columns: 30px 1fr 24px; gap: 8px; align-items: center; font-size: 10.5px; font-weight: 700; color: var(--muted); }
+  .kpi .stack i { height: 5px; border-radius: 5px; background: var(--line-2); overflow: hidden; display: block; }
+  .kpi .stack em { display: block; height: 100%; background: var(--c); border-radius: 5px; }
+  .kpi .stack span:last-child { text-align: right; color: var(--ink-2); }
+  @container (max-width: 360px) { .kpi svg.spark { display: none; } .kpi .stack { width: 120px; } }
+  @container (max-width: 290px) { .kpi-vis { display: none; } }
+
+  .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-sm); min-width: 0; display: flex; flex-direction: column; }
+  .card + .card { margin-top: 0; }
+  .stackv > .card + .card { margin-top: 14px; }
+  .card.wide { grid-column: 1 / -1; }
+  .card-head { display: flex; align-items: center; gap: 10px; padding: 13px 18px; border-bottom: 1px solid var(--line-2); flex-wrap: wrap; min-height: 52px; }
+  .card-head h3 { margin: 0; font-size: 11.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
+  .card-head h3 svg { width: 15px; height: 15px; color: var(--accent); }
+  .card-head .note { font-size: 11.5px; color: var(--muted); }
+  .card-body { padding: 16px 18px 18px; flex: 1; min-height: 0; }
+  .card-body.flush { padding: 0; }
+  .dist { display: grid; grid-template-columns: 40px 1fr 96px; gap: 12px 14px; align-items: center; }
+  .dist b { font-size: 12px; font-weight: 700; }
+  .dist .track { height: 10px; border-radius: 6px; background: var(--line-2); overflow: hidden; display: flex; }
+  .dist .track em { background: var(--c); }
+  .dist .track i { background: color-mix(in srgb, var(--c) 22%, white); }
+  .dist .val { text-align: right; font-size: 12.5px; font-weight: 650; line-height: 1.25; }
+  .dist .val small { display: block; font-size: 10.5px; color: var(--muted); font-weight: 500; }
+  .legend-row { display: flex; gap: 16px; font-size: 11px; color: var(--muted); margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--line); flex-wrap: wrap; }
+  .legend-row i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+  table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.5px; }
+  .tbl th { text-align: left; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 9px 12px; border-bottom: 1px solid var(--line); background: #f8fafc; position: sticky; top: 0; z-index: 1; white-space: nowrap; }
+  .tbl td { padding: 9px 12px; border-bottom: 1px solid var(--line-2); white-space: nowrap; vertical-align: middle; }
+  .tbl td.wrap { white-space: normal; min-width: 240px; }
+  .tbl tbody tr:last-child td { border-bottom: 0; }
+  .tbl tr.click { cursor: pointer; }
+  .tbl tr.click:hover td { background: #f6f9ff; }
+  .tbl td.r, .tbl th.r { text-align: right; }
+  .tbl td.muted, .tbl .muted { color: var(--muted); }
+  .tbl .mini { display: inline-block; width: 80px; height: 5px; border-radius: 5px; background: var(--line-2); overflow: hidden; vertical-align: middle; margin-right: 8px; }
+  .tbl .mini em { display: block; height: 100%; background: var(--c); }
+  .tbl tfoot td { font-weight: 700; border-top: 1px solid var(--line); border-bottom: 0; background: #f8fafc; }
+  .tbl .warn { color: var(--warn); font-weight: 700; }
+  .tbl del { color: var(--err); text-decoration-color: rgba(220,38,38,.45); }
+  .tbl ins { color: var(--ok); text-decoration: none; font-weight: 600; }
+  .table-wrap { overflow: auto; max-height: calc(100vh - 270px); border-radius: 0 0 12px 12px; }
+  .ok-txt { color: var(--ok); font-weight: 700; }
+
+  .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; }
+  .seg { display: inline-flex; padding: 3px; background: var(--hover); border: 1px solid var(--line); border-radius: 9px; gap: 2px; flex-wrap: wrap; }
+  .seg button { border: 0; background: none; height: 26px; padding: 0 10px; border-radius: 6px; font-size: 11.5px; font-weight: 650; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+  .seg button i { width: 7px; height: 7px; border-radius: 2px; background: var(--c); }
+  .seg button small { font-size: 10.5px; color: var(--faint); font-weight: 600; }
+  .seg button:hover { color: var(--ink); }
+  .seg button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(15,23,42,.08), 0 0 0 1px var(--line); }
+  .input-search { height: 32px; width: 260px; max-width: 100%; padding: 0 10px 0 32px; border: 1px solid var(--line); border-radius: 8px; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%2394a3b8' stroke-width='2' viewBox='0 0 24 24'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 10px center; font-size: 12.5px; }
+  .input-search:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+  .strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
+  .mstat { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow-sm); display: flex; align-items: center; gap: 12px; }
+  .mstat .ico { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: color-mix(in srgb, var(--k) 11%, white); color: var(--k); flex: none; }
+  .mstat .ico svg { width: 17px; height: 17px; }
+  .mstat b { display: block; font-size: 20px; font-weight: 700; line-height: 1.15; }
+  .mstat span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; font-weight: 650; }
+
+  .issues { display: flex; flex-direction: column; gap: 8px; }
+  .issue { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; padding: 10px 12px; border-radius: 9px; background: var(--warn-bg); border: 1px solid var(--warn-line); font-size: 12.5px; cursor: pointer; }
+  .issue:hover { border-color: #fbbf24; }
+  .issue > svg { width: 15px; height: 15px; color: #d97706; margin-top: 2px; }
+  .issue b { display: block; font-size: 12px; font-weight: 650; }
+  .issue span { color: #78350f; }
+  .issue em { font-style: normal; font-size: 11px; color: var(--warn); font-weight: 650; white-space: nowrap; align-self: center; }
+  .ok-box { display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-radius: 10px; background: var(--ok-bg); border: 1px solid var(--ok-line); color: var(--ok); font-weight: 600; font-size: 12.5px; }
+  .ok-box svg { flex: none; }
+
+  .changes { display: flex; flex-direction: column; }
+  .chg-row { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line-2); cursor: pointer; font-size: 12px; }
+  .chg-row:last-child { border-bottom: 0; }
+  .chg-row:hover { background: var(--hover); }
+  .chg-row time { color: var(--faint); font-size: 11px; padding-top: 1px; }
+  .chg-row b { font-weight: 650; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chg-row div div { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chg-row del { color: var(--err); } .chg-row ins { color: var(--ok); text-decoration: none; font-weight: 600; }
+  .ev-card + .ev-card { margin-top: 14px; }
+  .ev-card .card-head b { font-size: 13px; }
+
+  .dl-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
+  .dl { border: 1px solid var(--line); border-radius: 12px; padding: 18px; text-align: left; background: #fff; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--shadow-sm); transition: border-color .12s, box-shadow .12s; }
+  .dl:hover:not(:disabled) { border-color: var(--accent-line); box-shadow: var(--shadow); }
+  .dl .fmt-ico { width: 44px; height: 44px; border-radius: 10px; background: color-mix(in srgb, var(--c) 10%, white); color: var(--c); display: grid; place-items: center; font-size: 11px; font-weight: 800; letter-spacing: .06em; margin-bottom: 6px; }
+  .dl b { font-size: 13.5px; font-weight: 650; }
+  .dl span { font-size: 12px; color: var(--muted); }
+  .dl u { text-decoration: none; margin-top: 8px; font-size: 12px; font-weight: 650; color: var(--accent-2); }
+  .dash-empty { background: #fff; border: 1px dashed #cbd5e1; border-radius: 12px; padding: 48px 24px; text-align: center; color: var(--muted); }
+  .dash-empty h3 { color: var(--ink); margin: 12px 0 6px; font-size: 16px; }
+  .dash-empty p { max-width: 460px; margin: 0 auto 18px; }
+  .chip { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .04em; color: #fff; background: var(--c); border-radius: 5px; padding: 1px 6px; min-width: 34px; text-align: center; line-height: 16px; flex: none; }
+
+  /* templates page */
+  .tpl-drop { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 26px 20px; text-align: center; background: #f8fafc; color: var(--muted); transition: border-color .12s, background .12s; }
+  .tpl-drop.over { border-color: var(--accent); background: #eff6ff; }
+  .tpl-drop h3 { margin: 10px 0 4px; color: var(--ink); font-size: 15px; }
+  .tpl-drop p { margin: 0 auto 14px; max-width: 560px; font-size: 12.5px; }
+  .tpl-form { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; margin-bottom: 14px; font-size: 12.5px; color: var(--ink-2); }
+  .tpl-form input[type=text], .tpl-form select, .tpl-sel { height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; background: #fff; min-width: 200px; }
+  .tpl-log { margin-top: 14px; font: 12px/1.6 ui-monospace, Consolas, monospace; background: #0f172a; color: #cbd5e1; border-radius: 10px; padding: 10px 14px; max-height: 190px; overflow: auto; text-align: left; white-space: pre-wrap; }
+  .tpl-log .err { color: #fca5a5; } .tpl-log .ok { color: #86efac; }
+  .tags { display: flex; gap: 4px; flex-wrap: wrap; }
+  .tag-chip { font-size: 10.5px; font-weight: 650; border-radius: 5px; padding: 1px 6px; background: #eef2ff; color: #3730a3; }
+  .tag-chip.g { background: #dcfce7; color: #166534; } .tag-chip.w { background: #fef3c7; color: #92400e; } .tag-chip.r { background: #fee2e2; color: #991b1b; }
+  .set-row { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--line-2); }
+  .set-row:last-child { border-bottom: 0; }
+  .set-row.active { background: #f5f8ff; }
+  .set-row b { font-size: 13px; } .set-row small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 1px; }
+  .cover { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; padding: 16px 18px; }
+  .cover div { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 12px; display: flex; flex-direction: column; gap: 2px; }
+  .cover div.ok { border-color: var(--ok-line); background: var(--ok-bg); } .cover div.miss { border-color: var(--warn-line); background: var(--warn-bg); }
+  .cover b { font-size: 13px; }
+
+  @media (max-width: 1200px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .cards { grid-template-columns: 1fr; } .dl-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 1100px) {
+    .shell { grid-template-columns: 60px minmax(0, 1fr); }
+    .nav { padding: 10px 8px; align-items: center; }
+    .nav .sec, .nav .lbl, .nav .foot { display: none; }
+    .nav button { justify-content: center; padding: 0; width: 40px; height: 38px; }
+    .nav button.active::before { left: -8px; }
+    .nav .n { position: absolute; top: 0; right: -4px; padding: 0 4px; line-height: 14px; font-size: 9px; min-width: 14px; }
+  }
+  @media (max-width: 700px) { .kpis, .strip { grid-template-columns: 1fr; } .shell, body.view-draw .shell { grid-template-columns: 1fr; } .nav { display: none; } .page-in { padding: 16px; } .page-head .right { margin-left: 0; text-align: left; } }
+
+  /* ---------- drawing layout ---------- */
+  .layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 290px minmax(0, 1fr) 330px; transition: grid-template-columns .2s; }
+  body.no-side .layout { grid-template-columns: 0 minmax(0, 1fr) 330px; }
+  body.no-insp .layout { grid-template-columns: 290px minmax(0, 1fr) 0; }
+  body.no-side.no-insp .layout { grid-template-columns: 0 minmax(0, 1fr) 0; }
+  .sidebar, .inspector { background: var(--panel); display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+  .sidebar { border-right: 1px solid var(--line); }
+  .inspector { border-left: 1px solid var(--line); }
+  body.no-side .sidebar, body.no-insp .inspector { border: 0; }
+  .workspace { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+
+  .source { padding: 14px 14px 12px; border-bottom: 1px solid var(--line); }
+  .eyebrow { font-size: 9.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); margin: 0 0 5px; }
+  .file-name { font-weight: 650; font-size: 12.5px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-meta { color: var(--muted); font-size: 11px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 10px; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .stat { padding: 6px 9px; min-width: 0; border-right: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); }
+  .stat:nth-child(3n) { border-right: 0; }
+  .stat:nth-child(n+4) { border-bottom: 0; }
+  .stat b { display: block; font-size: 14px; font-weight: 700; line-height: 1.25; }
+  .stat span { display: block; font-size: 9.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .readline { margin-top: 8px; font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .readline span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .readline i { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); flex: none; }
+  .notice { margin-top: 10px; font-size: 11.5px; color: var(--warn); background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 8px; padding: 7px 9px; }
+  .notice:empty { display: none; }
+
+  .types { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .type { position: relative; text-align: center; padding: 6px 2px 7px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); overflow: hidden; transition: border-color .12s, background .12s; min-width: 0; }
+  .type b { display: block; font-size: 11px; letter-spacing: .03em; font-weight: 700; color: var(--c, var(--ink)); }
+  .type span { display: block; font-size: 10.5px; color: var(--muted); font-weight: 600; }
+  .type .meter { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--line-2); }
+  .type .meter em { display: block; height: 100%; background: var(--c, var(--ink)); }
+  .type:hover:not(:disabled) { background: var(--hover); }
+  .type.active { border-color: var(--c, var(--ink)); background: color-mix(in srgb, var(--c, var(--ink)) 7%, white); box-shadow: inset 0 0 0 1px var(--c, var(--ink)); }
+  .type.active span { color: var(--ink); }
+
+  .search { padding: 10px 12px; border-bottom: 1px solid var(--line-2); position: relative; }
+  .search input { width: 100%; height: 32px; padding: 0 40px 0 32px; border: 1px solid var(--line); border-radius: 8px; background: var(--hover) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%2394a3b8' stroke-width='2' viewBox='0 0 24 24'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 10px center; font-size: 12.5px; }
+  .search input:focus { outline: 2px solid var(--accent); outline-offset: -1px; background-color: #fff; }
+  .search kbd { position: absolute; right: 21px; top: 19px; pointer-events: none; }
+
+  .modules { flex: 1; overflow: auto; padding: 0 8px 16px; }
+  .group-title { display: flex; justify-content: space-between; gap: 8px; font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); padding: 12px 8px 6px; position: sticky; top: 0; background: var(--panel); z-index: 1; white-space: nowrap; }
+  .mod { border-radius: 8px; }
+  .mod + .mod { margin-top: 1px; }
+  .mod-head { width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; text-align: left; padding: 6px 8px; border: 0; background: none; border-radius: 8px; }
+  .mod-head:hover { background: var(--hover); }
+  .mod.active { background: var(--accent-soft); }
+  .mod.active .mod-head:hover { background: transparent; }
+  .mod-name { font-weight: 600; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mod-name small { font-weight: 400; color: var(--muted); margin-left: 6px; font-size: 11px; }
+  .mod-meta { font-size: 11px; color: var(--muted); white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+  .ring { width: 16px; height: 16px; border-radius: 50%; background: conic-gradient(var(--c) calc(var(--p) * 1%), var(--line) 0); display: grid; place-items: center; }
+  .ring::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--panel); }
+  .mod.active .ring::after { background: var(--accent-soft); }
+  .mod-meta .w { color: var(--warn); font-weight: 700; }
+  .mod-meta .chg { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .sheets { padding: 0 6px 7px 50px; display: none; }
+  .mod.active .sheets { display: block; }
+  .sheet { width: 100%; display: flex; justify-content: space-between; gap: 8px; text-align: left; border: 1px solid transparent; background: none; border-radius: 6px; padding: 4px 8px; font-size: 11.5px; color: var(--muted); }
+  .sheet span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sheet:hover { background: rgba(255,255,255,.8); }
+  .sheet.active { background: #fff; border-color: var(--accent-line); color: var(--ink); font-weight: 600; box-shadow: var(--shadow-sm); }
+  .sheet span:last-child { color: var(--faint); font-weight: 400; white-space: nowrap; }
+  .list-empty { padding: 26px 14px; text-align: center; color: var(--muted); font-size: 12px; }
+
+  /* ---------- sheet bar ---------- */
+  .sheetbar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 14px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .sheet-title { min-width: 0; flex: 1 1 280px; }
+  .sheet-title h1 { margin: 0; font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .sheet-title h1 .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sheet-title p { margin: 5px 0 0; color: var(--muted); font-size: 12px; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+  .sheet-tools { display: flex; align-items: center; gap: 8px; margin-left: auto; flex: none; }
+  .pill { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; font-size: 11px; line-height: 19px; color: var(--muted); background: var(--hover); white-space: nowrap; }
+  .pill b { color: var(--ink); font-weight: 600; }
+  .group { display: flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 9px; background: var(--hover); }
+  .group .icon-btn { border-color: transparent; background: transparent; width: 28px; height: 28px; }
+  .group .icon-btn:hover:not(:disabled) { background: #fff; border-color: var(--line); }
+  .group b { min-width: 64px; text-align: center; font-size: 12px; font-weight: 650; }
+  .group .zoom { min-width: 46px; font-size: 11.5px; color: var(--muted); border: 0; background: none; font-weight: 650; height: 28px; }
+  .module-notice { flex: none; margin: 0; border-radius: 0; border-width: 0 0 1px; padding: 7px 16px; }
+
+  /* ---------- canvas ---------- */
+  .canvas { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #dfe4ec; background-image: linear-gradient(rgba(255,255,255,.35) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.35) 1px, transparent 1px); background-size: 24px 24px; }
+  #stage { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+  #stage.drag { cursor: grabbing; }
+  #paperShadow { filter: drop-shadow(0 6px 22px rgba(15,23,42,.18)); }
+  #txt text { font-family: Arial, Helvetica, sans-serif; fill: #000; cursor: text; }
+  #txt text:hover { fill: var(--accent); }
+  #txt text.edited { fill: #b45309; }
+  #txt text.changed { fill: var(--ok); animation: flash 1.2s ease-in-out 3; }
+  #txt text.focus { fill: var(--accent); }
+  #txt text.sel { fill: var(--accent); }
+  @keyframes flash { 50% { fill: #34d399; } }
+  #hl rect { fill: rgba(37,99,235,.08); stroke: var(--accent); stroke-width: 3; stroke-dasharray: 14 8; rx: 10; }
+  .floating { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; z-index: 3; }
+  .floating .hint { background: rgba(15,27,45,.78); color: #dbe5f2; border-radius: 8px; padding: 5px 10px; font-size: 11px; backdrop-filter: blur(4px); }
+  .floating .hint kbd { background: rgba(255,255,255,.1); color: #fff; border-color: rgba(255,255,255,.2); }
+  .empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; z-index: 4; }
+  .drop { width: min(560px, 100%); background: var(--panel); border-radius: 14px; box-shadow: var(--shadow-lg); padding: 30px 32px; text-align: center; border: 1px solid var(--line); }
+  .drop h2 { margin: 12px 0 6px; font-size: 18px; }
+  .drop p { margin: 0 0 18px; color: var(--muted); }
+  .drop .tpl { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 18px; }
+  .drop .tpl span { font-size: 11px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; color: var(--muted); }
+  body.dragover .canvas::after { content: "Drop the Excel file to import"; position: absolute; inset: 12px; border: 3px dashed var(--accent); border-radius: 14px; display: grid; place-items: center; font-size: 18px; font-weight: 600; color: var(--accent); background: rgba(234,241,255,.85); z-index: 8; }
+
+  .statusbar { flex: none; display: flex; align-items: center; gap: 12px; padding: 0 14px; height: 32px; background: var(--panel); border-top: 1px solid var(--line); font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+  .statusbar > span:not(.sep) { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .statusbar > span:last-child { flex: 1; }
+  .statusbar .sep { width: 1px; height: 14px; background: var(--line); flex: none; }
+  .linkish { border: 0; background: none; color: var(--accent); padding: 0; font-weight: 600; }
+
+  /* ---------- inspector ---------- */
+  .tabs { display: flex; gap: 4px; padding: 0 12px; border-bottom: 1px solid var(--line); flex: none; height: 46px; align-items: stretch; }
+  .tab { border: 0; background: none; padding: 0 8px; font-weight: 600; font-size: 12.5px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; display: flex; gap: 6px; align-items: center; }
+  .tab:hover { color: var(--ink); }
+  .tab.active { color: var(--ink); border-color: var(--accent); }
+  .tab .count { font-size: 10px; background: var(--line-2); border-radius: 999px; padding: 0 6px; line-height: 16px; color: var(--muted); }
+  .tab .count.new { background: var(--ok); color: #fff; }
+  .pane { flex: 1; overflow: auto; display: none; }
+  .pane.active { display: block; }
+  .usage { padding: 12px 14px; border-bottom: 1px solid var(--line-2); font-size: 12px; background: #fafbfd; }
+  .usage .bar { display: flex; height: 6px; border-radius: 6px; overflow: hidden; background: var(--line-2); margin: 7px 0 6px; }
+  .usage .bar em { background: var(--c, var(--accent)); }
+  .usage .bar em.edit { background: #f59e0b; }
+  .usage .legend { display: flex; gap: 12px; font-size: 11px; color: var(--muted); }
+  .usage .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
+  .ch { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 8px; padding: 9px 14px 9px 11px; border-bottom: 1px solid var(--line-2); cursor: pointer; border-left: 3px solid transparent; }
+  .ch:hover { background: var(--hover); }
+  .ch.active { background: var(--accent-soft); border-left-color: var(--accent); }
+  .ch .no { font-size: 10.5px; font-weight: 700; color: var(--muted); padding-top: 2px; }
+  .ch .tag { font-weight: 650; font-size: 12.5px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .ch .desc { font-size: 11.5px; color: var(--muted); line-height: 1.35; margin-top: 1px; }
+  .ch .meta { font-size: 10.5px; color: var(--faint); margin-top: 3px; }
+  .ch.spare .tag { color: var(--faint); font-weight: 500; }
+  .badge { font-size: 9px; font-weight: 700; letter-spacing: .05em; border-radius: 4px; padding: 0 5px; line-height: 15px; text-transform: uppercase; }
+  .badge.edit { background: #fef3c7; color: #92400e; }
+  .badge.chg { background: var(--ok-bg); color: var(--ok); }
+  .badge.ref { background: #e0e7ff; color: #3730a3; }
+  .feed-head { padding: 12px 14px; border-bottom: 1px solid var(--line-2); font-size: 11.5px; color: var(--muted); background: #fafbfd; }
+  .feed-head b { color: var(--ink); display: block; font-size: 12.5px; margin-bottom: 2px; }
+  .event { padding: 10px 14px; border-bottom: 1px solid var(--line-2); font-size: 12px; }
+  .event .when { font-size: 10.5px; color: var(--faint); display: flex; justify-content: space-between; }
+  .event .what { font-weight: 600; margin: 1px 0 3px; }
+  .event .row { display: grid; grid-template-columns: 1fr; gap: 1px; padding: 5px 8px; background: var(--hover); border-radius: 6px; margin-top: 4px; cursor: pointer; }
+  .event .row:hover { background: var(--accent-soft); }
+  .event .row small { color: var(--muted); }
+  .event del { color: var(--err); text-decoration-color: rgba(220,38,38,.45); }
+  .event ins { color: var(--ok); text-decoration: none; font-weight: 600; }
+
+  .editor { position: absolute; z-index: 5; width: 380px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-lg); padding: 12px; display: none; }
+  .editor.show { display: block; }
+  .editor label { display: block; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
+  .editor .row { display: flex; gap: 6px; align-items: center; }
+  .editor .prefix { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .editor input { flex: 1; min-width: 0; height: 32px; padding: 0 9px; border: 1px solid var(--line); border-radius: 8px; }
+  .editor input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .editor .from { font-size: 11.5px; color: var(--muted); margin: 8px 0 10px; word-break: break-word; }
+  .editor .actions { display: flex; gap: 6px; justify-content: flex-end; }
+
+  .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: var(--bar); color: #fff; padding: 9px 16px; border-radius: 10px; font-size: 12.5px; box-shadow: var(--shadow-lg); display: none; max-width: 80%; z-index: 50; }
+  .toast.show { display: block; }
+  .toast.err { background: var(--err); }
+  .toast.ok { background: #0b6e3c; }
+  #offline { display: none; background: var(--err); color: #fff; padding: 8px 18px; font-size: 12.5px; }
+
+  dialog { border: 0; border-radius: 14px; padding: 0; width: min(560px, calc(100vw - 32px)); box-shadow: 0 24px 60px rgba(15,23,42,.3); color: var(--ink); }
+  dialog::backdrop { background: rgba(15,23,42,.5); backdrop-filter: blur(2px); }
+  .dlg-head { padding: 18px 22px 14px; border-bottom: 1px solid var(--line); }
+  .dlg-head h3 { margin: 0; font-size: 15px; text-transform: uppercase; letter-spacing: .04em; }
+  .dlg-head p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+  .dlg-body { padding: 14px 22px; max-height: 62vh; overflow: auto; }
+  .formats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+  .fmt { border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; cursor: pointer; display: block; position: relative; }
+  .fmt input { position: absolute; opacity: 0; pointer-events: none; }
+  .fmt b { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .fmt span { font-size: 11px; color: var(--muted); line-height: 1.3; display: block; margin-top: 2px; }
+  .fmt:hover { background: var(--hover); }
+  .fmt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+  .choice { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; margin-bottom: 6px; cursor: pointer; font-size: 12.5px; }
+  .choice:hover { background: var(--hover); }
+  .choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .choice input { margin: 0; accent-color: var(--accent); }
+  .choice span:last-child { color: var(--muted); font-size: 12px; }
+  .field { margin-top: 12px; }
+  .field label { display: block; font-size: 11.5px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+  .field input[type=text] { width: 100%; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; }
+  .check { display: flex; gap: 8px; align-items: center; margin-top: 12px; font-size: 12px; color: var(--muted); }
+  .dlg-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 22px 18px; border-top: 1px solid var(--line-2); }
+  .dlg-state { flex: 1; align-self: center; font-size: 12px; color: var(--muted); }
+  .spin { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: rot .8s linear infinite; display: none; }
+  .busy .spin { display: inline-block; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+
+  @media (max-width: 1400px) {
+    .layout { grid-template-columns: 270px minmax(0, 1fr) 0; }
+    body.insp-open .layout { grid-template-columns: 270px minmax(0, 1fr) 300px; }
+    body.no-side .layout { grid-template-columns: 0 minmax(0, 1fr) 0; }
+    body.no-side.insp-open .layout { grid-template-columns: 0 minmax(0, 1fr) 300px; }
+    .floating { display: none; }
+  }
+  @media (max-width: 900px) {
+    body { overflow: auto; }
+    .layout, body.insp-open .layout { grid-template-columns: 1fr; grid-template-rows: auto 72vh; }
+    .sidebar { max-height: 46vh; border-right: 0; border-bottom: 1px solid var(--line); }
+    .inspector { display: none; }
+    .brand span, .btn .lbl { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="offline">The drawing server is not running. Start it with <b>start.bat</b>, then reload this page.</div>
+
+<header class="appbar">
+  <div class="brand">
+    <button id="sideBtn" class="mark" title="Show / hide the module list  ( [ )" aria-label="Toggle module list"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M4 6h8M4 12h16M4 18h11"/></svg></button>
+    <div class="brand-txt"><b>Loop <em>Drawings</em></b><span id="projectLine">DCS I/O engineering · loop drawing generator</span></div>
+  </div>
+  <div class="spacer"></div>
+  <button id="liveBadge" class="live" type="button"><i></i><span></span></button>
+  <button id="clearBtn" class="btn danger" disabled title="Delete ALL data: the imported Excel, edits, live changes and all template sets">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></svg>
+    <span class="lbl">Clear data</span>
+  </button>
+  <button id="importBtn" class="btn dark" title="Import the IO ASSIGNMENT Excel (.xlsx)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+    <span class="lbl">Import Excel</span>
+  </button>
+  <input id="xlsx" type="file" accept=".xlsx,.xlsm" hidden>
+  <button id="downloadBtn" class="btn gold" disabled title="Download PDF, DWG or DXF">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 14l3 3 3-3M12 10v7"/></svg>
+    <span class="lbl">Download</span>
+  </button>
+</header>
+
+<div class="shell">
+<nav class="nav" aria-label="Menu">
+  <div class="sec">Main</div>
+  <button data-view="dash" title="Dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span class="lbl">Dashboard</span></button>
+  <button data-view="draw" title="Loop drawings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M8 13h8M8 17h5"/></svg><span class="lbl">Loop Drawings</span><span id="navSheets" class="n"></span></button>
+  <div class="sec">Engineering</div>
+  <button data-view="modules" title="IO modules"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9zM9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg><span class="lbl">IO Modules</span><span id="navMods" class="n" style="background:#64748b"></span></button>
+  <button data-view="checks" title="Data checks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></svg><span class="lbl">Data Checks</span><span id="navWarn" class="n w"></span></button>
+  <button data-view="live" title="Live changes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 8-6-16-3 8H2"/></svg><span class="lbl">Live Changes</span><span id="navLive" class="n g"></span></button>
+  <div class="sec">Setup</div>
+  <button data-view="templates" title="Template drawings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg><span class="lbl">Templates</span><span id="navTpl" class="n" style="background:#7c3aed"></span></button>
+  <div class="sec">Output</div>
+  <button data-view="downloads" title="Downloads"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><span class="lbl">Downloads</span></button>
+  <div class="foot">
+    <span class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 12l6 6M15 12l-6 6"/></svg></span>
+    <div><b id="navFile">No workbook</b><span id="navRead">Import an IO assignment</span></div>
+  </div>
+</nav>
+<div class="views">
+
+<section id="page-dash" class="page">
+  <div class="page-in">
+    <header class="page-head">
+      <div>
+        <div class="crumb">Main / Dashboard</div>
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Loop Drawing Dashboard</h2>
+        <p id="dashSub">IO assignment overview · generated drawing set</p>
+      </div>
+      <div class="right" id="dashRight"></div>
+    </header>
+    <div id="dashBody"></div>
+  </div>
+</section>
+
+<section id="page-modules" class="page">
+  <div class="page-in">
+    <header class="page-head">
+      <div>
+        <div class="crumb">Engineering / IO Modules</div>
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9zM9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>IO Modules</h2>
+        <p>Every module read from the IO assignment · click a row to open its loop drawing</p>
+      </div>
+    </header>
+    <div id="modEmpty"></div>
+    <div class="card" id="modCard">
+      <div class="card-head">
+        <div class="toolbar"><div class="seg" id="modTypeSeg"></div><span class="note" id="modCount"></span></div>
+        <input id="modSearch" class="input-search" type="search" placeholder="Search module, IOM, TB, tag…" spellcheck="false">
+      </div>
+      <div class="table-wrap"><table class="tbl"><thead><tr><th>#</th><th>Type</th><th>Module</th><th>Controller</th><th>Link</th><th class="r">IOM</th><th>IOP</th><th>IOTA</th><th>TB / RTP</th><th>Excel rows</th><th class="r">Sheets</th><th>Channels used</th><th>Checks</th></tr></thead><tbody id="modRows"></tbody></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="page-checks" class="page">
+  <div class="page-in">
+    <header class="page-head">
+      <div>
+        <div class="crumb">Engineering / Data Checks</div>
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></svg>Data Checks</h2>
+        <p>Findings in the workbook that affect the loop drawings</p>
+      </div>
+    </header>
+    <div id="checksBody"></div>
+  </div>
+</section>
+
+<section id="page-live" class="page">
+  <div class="page-in">
+    <header class="page-head">
+      <div>
+        <div class="crumb">Engineering / Live Changes</div>
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 8-6-16-3 8H2"/></svg>Live Changes</h2>
+        <p>Every Excel save is read again and compared cell by cell</p>
+      </div>
+      <div class="right" id="liveRight"></div>
+    </header>
+    <div id="liveBody"></div>
+  </div>
+</section>
+
+<section id="page-templates" class="page">
+  <div class="page-in">
+    <header class="page-head">
+      <div>
+        <div class="crumb">Setup / Templates</div>
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Template Drawings</h2>
+        <p>Import any loop template DWG with its FRAME · every text that changes is detected automatically</p>
+      </div>
+      <div class="right" id="tplRight"></div>
+    </header>
+    <div id="tplBody"></div>
+    <input id="dwgFiles" type="file" accept=".dwg" multiple hidden>
+  </div>
+</section>
+
+<section id="page-downloads" class="page">
+  <div class="page-in">
+    <header class="page-head">
+      <div>
+        <div class="crumb">Output / Downloads</div>
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>Downloads</h2>
+        <p>Always generated from the current Excel values and your text edits</p>
+      </div>
+    </header>
+    <div id="dlBody"></div>
+  </div>
+</section>
+
+<main class="layout">
+  <aside class="sidebar">
+    <section class="source">
+      <p class="eyebrow">IO assignment</p>
+      <div id="fileName" class="file-name">No workbook imported</div>
+      <div id="fileMeta" class="file-meta">Supported: .xlsx / .xlsm with MODULE NAME and CHANNEL columns</div>
+      <div id="stats" class="stats" hidden></div>
+      <div id="readLine" class="readline" hidden><i></i><span></span></div>
+      <div id="bookWarn" class="notice"></div>
+    </section>
+    <nav id="typeTabs" class="types" aria-label="IO type"></nav>
+    <div class="search"><input id="search" type="search" placeholder="Search module, TB or field tag" spellcheck="false"><kbd>/</kbd></div>
+    <div id="moduleList" class="modules"></div>
+  </aside>
+
+  <section class="workspace">
+    <div class="sheetbar">
+      <div class="sheet-title">
+        <h1 id="sheetTitle">No sheet</h1>
+        <p id="sheetSub">Import an Excel file to start</p>
+      </div>
+      <div class="sheet-tools">
+        <div class="group">
+          <button id="prevBtn" class="icon-btn" title="Previous sheet (Page Up / ←)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg></button>
+          <b id="pageLabel" class="num">– / –</b>
+          <button id="nextBtn" class="icon-btn" title="Next sheet (Page Down / →)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg></button>
+        </div>
+        <div class="group">
+          <button id="zoomOut" class="icon-btn" title="Zoom out ( - )"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+          <button id="zoomLabel" class="zoom num" title="Fit the sheet ( F )">100%</button>
+          <button id="zoomIn" class="icon-btn" title="Zoom in ( + )"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+          <button id="fitWBtn" class="icon-btn" title="Fit width ( W )"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/></svg></button>
+        </div>
+        <button id="dwgBtn" class="btn sm" disabled title="Download this sheet as an AutoCAD DWG">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+          DWG
+        </button>
+        <button id="inspBtn" class="icon-btn on" title="Channels & live changes panel ( ] )"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>
+      </div>
+    </div>
+    <div id="moduleWarn" class="notice module-notice"></div>
+
+    <div id="canvas" class="canvas">
+      <svg id="stage" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+        <g id="paperShadow"><rect id="paper" fill="#fff"></rect></g>
+        <image id="bg" preserveAspectRatio="none"></image>
+        <g id="hl"></g>
+        <g id="txt"></g>
+      </svg>
+      <div class="floating"><span class="hint">Scroll to zoom · drag to pan · <kbd>F</kbd> fit · <kbd>W</kbd> width · <kbd>←</kbd><kbd>→</kbd> sheets</span></div>
+      <div id="empty" class="empty">
+        <div class="drop">
+          <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M8 13h8M8 17h5"/></svg>
+          <h2>Import the IO assignment</h2>
+          <p>Every module becomes loop drawing sheets on the matching template, inside the project frame. The workbook stays linked: save it in Excel and the sheets update live.</p>
+          <button id="importBtn2" class="btn primary">Choose Excel file</button>
+          <div class="tpl"><span>AI 2-wire</span><span>AI 4-wire</span><span>AO</span><span>RTD · 2 sheets</span><span>DI · 2 sheets</span><span>DO · 2 sheets</span></div>
+        </div>
+      </div>
+      <div id="editor" class="editor" role="dialog" aria-label="Edit drawing text">
+        <label id="edLabel"></label>
+        <div class="row"><span id="edPrefix" class="prefix"></span><input id="edInput" type="text" spellcheck="false"></div>
+        <div id="edFrom" class="from"></div>
+        <div class="actions">
+          <button id="edReset" class="btn sm">Use Excel value</button>
+          <button id="edCancel" class="btn sm">Cancel</button>
+          <button id="edApply" class="btn sm primary">Apply</button>
+        </div>
+      </div>
+    </div>
+
+    <footer class="statusbar">
+      <span id="stTemplate">Template –</span><span class="sep"></span>
+      <span id="stRows">Excel rows –</span><span class="sep"></span>
+      <span id="stEdits">Click any text on the sheet to edit it</span>
+    </footer>
+  </section>
+
+  <aside class="inspector">
+    <div class="tabs">
+      <button class="tab active" data-pane="chPane">Channels <span id="chCount" class="count">0</span></button>
+      <button class="tab" data-pane="feedPane">Live changes <span id="feedCount" class="count">0</span></button>
+    </div>
+    <div id="chPane" class="pane active"></div>
+    <div id="feedPane" class="pane"></div>
+  </aside>
+</main>
+</div>
+</div>
+<div id="toast" class="toast"></div>
+
+<dialog id="dlDialog">
+  <form method="dialog">
+    <div class="dlg-head">
+      <h3>Download drawings</h3>
+      <p id="dlHint">One PDF with one A1 page per sheet.</p>
+    </div>
+    <div class="dlg-body">
+      <div class="formats">
+        <label class="fmt"><input type="radio" name="fmt" value="pdf" checked><b>PDF</b><span>One file, A1 pages</span></label>
+        <label class="fmt"><input type="radio" name="fmt" value="dwg"><b>DWG</b><span>AutoCAD, one file per sheet</span></label>
+        <label class="fmt"><input type="radio" name="fmt" value="dxf"><b>DXF</b><span>CAD exchange, one per sheet</span></label>
+      </div>
+      <div id="dlChoices"></div>
+      <div class="field">
+        <label for="dlName">File name</label>
+        <input id="dlName" type="text" spellcheck="false">
+      </div>
+      <label class="check"><input id="dlGlobal" type="checkbox" checked> Keep sheet numbers of the complete set (SHT. 34 /89)</label>
+    </div>
+    <div class="dlg-foot">
+      <span id="dlState" class="dlg-state"></span>
+      <button value="cancel" class="btn" formnovalidate>Cancel</button>
+      <button id="dlGo" value="default" class="btn primary"><span class="spin"></span>Download</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const SVGNS = "http://www.w3.org/2000/svg";
+  const CAP = 0.716;            // Arial cap height / em: DXF text height is the cap height
+  const MIN_CONDENSE = 0.6;     // same text fitting as the PDF / DWG
+  const STORE = "loopDrawings.v4";
+  const LIVE_MS = 1500;
+  const TYPES = ["AI", "AO", "RTD", "DI", "DO"];   // usual order of the drawing set; other IO types of the templates / workbook follow
+  const TYPE_NAMES = { AI: "Analog input", AO: "Analog output", RTD: "RTD input", DI: "Digital input", DO: "Digital output" };
+  const typeName = (t) => TYPE_NAMES[t] || t;
+  const HEADER_LABELS = { iop: "IOP", iota: "IOTA", iotype: "IO type", link: "Link", module: "Module name", iom: "IOM no.", tbname: "Marshalling TB name", rtpname: "RTP name", sysgroup: "System TB group", jbname: "JB no.", chlabel: "Channel no." };
+  const ROLE_LABELS = { sys: "System TB", tb: "Marshalling TB", rtp: "RTP", jb: "JB" };
+
+  let TPL = null;               // the analysed template set that is used (/api/templates)
+  let SETS = [];                // all template sets
+  let activeSet = null;         // id of the set in use
+  let book = null;              // /api/io result
+  let lastFile = null;          // the workbook as last read, to read it again for another template set
+  let sheets = [];              // flat list: { m, s, key, no, i }
+  const KEEP_BOOK_MAX_SHEETS = 3000;  // a bigger workbook is not saved in localStorage
+  const LIST_MAX_SHEETS = 600;        // more shown sheets than this: the sidebar lists modules, and the sheets of the open one
+  const LIST_MAX_MODULES = 400;       // ... at most this many modules (search / IO type tabs narrow the list)
+  const TABLE_MAX_ROWS = 500;         // rows of the module table
+  let cur = -1;                 // index in sheets
+  let filter = "ALL", query = "";
+  let edits = {};               // sheet key -> { handle: { v, base } }
+  let feed = [];                // live change events, newest first
+  let changed = new Set();      // "module|template|handle" changed by the last Excel save
+  let focusCh = null;           // channel number selected in the inspector
+  let unseen = 0;
+  const els = {};               // handle -> <text>
+  let fieldInfo = {};           // handle -> { info, label }
+
+  // ---------- helpers ----------
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+  const time = (t) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  function toast(msg, kind = "", ms = 2800) {
+    const t = $("toast");
+    t.textContent = msg; t.className = "toast show" + (kind === true ? " err" : kind ? " " + kind : "");
+    clearTimeout(toast.t);
+    if (ms) toast.t = setTimeout(() => (t.className = "toast"), ms);
+  }
+  function save() {
+    const cb = $("clearBtn");
+    if (cb) cb.disabled = !(book || feed.length || Object.keys(edits).length || SETS.length);
+    // A big workbook (tens of MB) is not kept in the browser: it is read again from the linked / imported Excel file
+    const keep = sheets.length <= KEEP_BOOK_MAX_SHEETS;
+    try { localStorage.setItem(STORE, JSON.stringify({ book: keep ? book : null, edits, set: activeSet, key: sheets[cur] && sheets[cur].key, filter, feed: keep ? feed.slice(0, 40) : [], ui: ui })); } catch (e) {}
+  }
+  function load() {
+    try { return JSON.parse(localStorage.getItem(STORE) || "null"); } catch (e) { return null; }
+  }
+  const tplOf = (i) => TPL.templates[sheets[i].s.template];
+  // A sheet of a one-channel template is one channel of a module: its id is template@channel, its channel is s.first
+  const sid = (s) => s.uid || s.template;
+  const chText = (s) => (s.first === s.last ? `CH${s.first}` : `CH${s.first}–${s.last}`);
+  const chPre = (t, ch) => (t.perChannel ? "" : `CH${ch} · `);
+
+  // Remembers the Excel file handle, so live update continues after a reload
+  const idb = {
+    open() { return new Promise((ok, bad) => { const r = indexedDB.open("loopDrawings", 1); r.onupgradeneeded = () => r.result.createObjectStore("kv"); r.onsuccess = () => ok(r.result); r.onerror = () => bad(r.error); }); },
+    async set(k, v) { try { const db = await this.open(); await new Promise((ok, bad) => { const tx = db.transaction("kv", "readwrite"); v === undefined ? tx.objectStore("kv").delete(k) : tx.objectStore("kv").put(v, k); tx.oncomplete = ok; tx.onerror = () => bad(tx.error); }); } catch (e) {} },
+    async get(k) { try { const db = await this.open(); return await new Promise((ok) => { const r = db.transaction("kv").objectStore("kv").get(k); r.onsuccess = () => ok(r.result); r.onerror = () => ok(undefined); }); } catch (e) { return undefined; } },
+  };
+
+  // ---------- Excel -> sheet texts ----------
+  // The server maps every workbook value to the text of the template it belongs to (io_excel.sheet_texts)
+  const excelTexts = (m, sh) => sh.texts;
+  const allFields = (t) => [...Object.values(t.header), ...(t.jblines || []), ...(t.jbtags || []), ...t.tags, ...t.descs, ...t.terms];
+  const labelCache = new WeakMap();
+  function fieldLabels(t) {
+    if (!labelCache.has(t)) {
+      const label = {};
+      for (const [key, f] of Object.entries(t.header)) label[f.h] = { name: HEADER_LABELS[key] || key };
+      (t.jblines || []).forEach((f) => (label[f.h] = { name: `JB no. (line ${f.slot + 1})` }));
+      (t.jbtags || []).forEach((f) => (label[f.h] = { name: "JB name", ch: f.ch }));
+      t.tags.forEach((f, i) => (label[f.h] = { name: "Field tag", ch: t.channels[i] }));
+      t.descs.forEach((f, i) => (label[f.h] = { name: "Description", ch: t.channels[i] }));
+      for (const f of t.terms) label[f.h] = { name: `${ROLE_LABELS[f.role] || f.role} terminal ${f.k + 1}${f.side ? " (side " + (f.side + 1) + ")" : ""}`, ch: f.ch };
+      labelCache.set(t, label);
+    }
+    return labelCache.get(t);
+  }
+  function sheetTexts(i) {
+    const { m, s, key } = sheets[i];
+    const base = excelTexts(m, s), texts = { ...base };
+    for (const [h, e] of Object.entries(edits[key] || {})) if (h in texts && e.base === base[h]) texts[h] = e.v;
+    return { base, texts };
+  }
+
+  const typeOrder = () => [...TYPES, ...new Set([...(TPL ? TPL.types : []), ...(book ? book.modules.map((m) => m.type) : [])].filter((t) => t && !TYPES.includes(t)))];
+  function buildSheets() {
+    sheets = [];
+    if (!book) return;
+    // Order of the drawing set: AI, AO, RTD, DI, DO, then anything else; Excel order inside a type
+    const order = typeOrder(), rank = (t) => (order.includes(t) ? order.indexOf(t) : order.length);
+    const mods = [...book.modules].sort((a, b) => rank(a.type) - rank(b.type) || a.index - b.index);
+    for (const m of mods) m.sheets.forEach((s, k) => sheets.push({ m, s, k, key: `${m.module}#${m.index}|${sid(s)}` }));
+    sheets.forEach((x, i) => { x.i = i; x.no = i + 1; });   // x.i: index in sheets (indexOf would be O(n²) for 100 000 sheets)
+    const keys = new Set(sheets.map((x) => x.key));
+    for (const k of Object.keys(edits)) if (!keys.has(k)) delete edits[k];
+  }
+
+  // ---------- live diff: what changed between two reads of the workbook ----------
+  function diffBooks(before, after) {
+    const rows = [];
+    if (!before) return rows;
+    const idx = (b) => { const map = new Map(); b.modules.forEach((m) => m.sheets.forEach((s) => map.set(`${m.module}|${sid(s)}`, { m, s }))); return map; };
+    const A = idx(before), B = idx(after);
+    for (const [k, { m, s }] of B) {
+      const t = TPL.templates[s.template];
+      const old = A.get(k);
+      if (!old) { rows.push({ module: m.module, template: s.template, uid: sid(s), what: `New sheet ${chText(s)}`, from: "", to: "" }); continue; }
+      const ta = excelTexts(old.m, old.s), tb = excelTexts(m, s);
+      const label = fieldLabels(t);
+      for (const h of Object.keys(tb)) {
+        if (ta[h] === tb[h] || !label[h]) continue;
+        const f = fieldInfoOf(t, h), p = (f && f.prefix) || "";
+        rows.push({ module: m.module, template: s.template, uid: sid(s), handle: h, ch: s.per ? s.first : label[h].ch, what: (label[h].ch ? `CH${s.per ? s.first : label[h].ch} · ` : "") + label[h].name,
+                    from: (ta[h] || "").slice(p.length), to: tb[h].slice(p.length) });
+      }
+    }
+    for (const [k, { m, s }] of A) if (!B.has(k)) rows.push({ module: m.module, template: s.template, uid: sid(s), what: `Sheet ${chText(s)} removed`, from: "", to: "" });
+    return rows;
+  }
+  function fieldInfoOf(t, h) { return allFields(t).find((f) => f.h === h); }
+
+  // ---------- sidebar ----------
+  function renderSource() {
+    const has = !!book;
+    $("fileName").textContent = has ? book.file || "Excel" : "No workbook imported";
+    $("fileName").title = has ? book.file || "" : "";
+    $("fileMeta").textContent = has
+      ? `Sheet “${book.sheet}” · header row ${book.headerRow} · ` + (book.mode === "yellow" ? `split at ${book.yellowRows.length} yellow rows` : "split by MODULE NAME")
+      : "Supported: .xlsx / .xlsm with MODULE NAME and CHANNEL columns";
+    const st = $("stats"); st.innerHTML = ""; st.hidden = !has;
+    if (has) {
+      const used = book.modules.reduce((a, m) => a + m.used, 0), cap = book.modules.reduce((a, m) => a + m.capacity, 0);
+      for (const [v, l] of [[book.dataRows, "Excel rows"], [book.modules.length, "Modules"], [sheets.length, "Sheets"], [used, "Used"], [cap - used, "Spare"], [cap ? Math.round((100 * used) / cap) + "%" : "–", "Utilised"]]) {
+        const d = el("div", "stat"); d.append(el("b", "num", String(v)), el("span", "", l)); st.append(d);
+      }
+    }
+    const rl = $("readLine"); rl.hidden = !(has && book.readAt);
+    if (has && book.readAt) rl.querySelector("span").textContent = `Read from the Excel file at ${time(book.readAt)}` + (book.modified ? ` · file saved ${new Date(book.modified).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}` : "");
+    $("bookWarn").textContent = has && book.warnings.length ? book.warnings[0] + (book.warnings.length > 1 ? `  (+${book.warnings.length - 1} more in Data Checks)` : "") : "";
+    $("projectLine").textContent = has ? `${book.file} — ${book.modules.length} modules · ${sheets.length} sheets` : "DCS I/O engineering · loop drawing generator";
+    $("downloadBtn").disabled = !sheets.length;
+    $("dwgBtn").disabled = !sheets.length;
+    $("clearBtn").disabled = !(book || feed.length || Object.keys(edits).length || SETS.length);
+    $("empty").style.display = sheets.length ? "none" : "";
+    // A workbook was read but nothing can be drawn: say why instead of asking for an import again
+    const noTpl = has && !sheets.length;
+    const drop = $("empty").querySelector(".drop");
+    drop.querySelector("h2").textContent = noTpl ? "No drawing can be made yet" : "Import the IO assignment";
+    drop.querySelector("p").textContent = noTpl
+      ? `The template set in use (“${TPL ? TPL.name : "none"}”) has no template for the IO types of ${book.file}. Choose the set that has them at the top right of the Templates page, or add the missing templates there.`
+      : "Every module becomes loop drawing sheets on the matching template, inside the project frame. The workbook stays linked: save it in Excel and the sheets update live.";
+    $("importBtn2").textContent = noTpl ? "Import another Excel file" : "Choose Excel file";
+    renderDash();
+  }
+
+  function renderTabs() {
+    const nav = $("typeTabs");
+    nav.innerHTML = "";
+    const mk = (t) => {
+      const list = sheets.filter((x) => t === "ALL" || x.m.type === t);
+      const mods = [...new Set(list.map((x) => x.m))];
+      const used = mods.reduce((a, m) => a + m.used, 0), cap = mods.reduce((a, m) => a + m.capacity, 0);
+      const b = el("button", "type" + (filter === t ? " active" : ""));
+      if (t !== "ALL") b.style.setProperty("--c", `var(--${t})`);
+      const meter = el("i", "meter"), fill = el("em"); fill.style.width = (cap ? (100 * used) / cap : 0) + "%"; meter.append(fill);
+      b.append(el("b", "", t), el("span", "num", book ? String(list.length) : "–"), meter);
+      b.title = (t === "ALL" ? "All IO types" : typeName(t)) + (book ? ` — ${mods.length} modules · ${list.length} sheets` : "") + (cap ? ` · ${used} of ${cap} channels used` : "");
+      b.disabled = !!book && !list.length;
+      b.onclick = () => { filter = t; renderTabs(); renderList(); const first = sheets.findIndex(visible); if (first >= 0 && !visible(sheets[cur])) show(first); save(); };
+      nav.append(b);
+    };
+    ["ALL", ...typeOrder()].forEach(mk);
+  }
+
+  function matches(x) {
+    if (!query) return true;
+    const q = query.toUpperCase();
+    return x.m.module.toUpperCase().includes(q) || (x.s.tbname || "").toUpperCase().includes(q) ||
+      x.s.channels.some((c) => c && ((c.tag || "").toUpperCase().includes(q) || (c.desc || "").toUpperCase().includes(q)));
+  }
+  const visible = (x) => !!x && (filter === "ALL" || x.m.type === filter) && matches(x);
+
+  function renderList() {
+    const list = $("moduleList");
+    list.innerHTML = "";
+    if (!book) { list.append(el("div", "list-empty", "Modules and their sheets will be listed here.")); return; }
+    const shown = sheets.filter(visible);
+    if (!shown.length) { list.append(el("div", "list-empty", "No sheet matches.")); return; }
+    const curMod = sheets[cur] && sheets[cur].m;
+    const changedMods = new Set([...changed].map((k) => k.split("|")[0]));
+    // Sheets of a module are next to each other. A big set (up to 100 000 sheets) lists modules only, cut at
+    // LIST_MAX_MODULES, and creates the sheet buttons of the open module alone - the other ones are hidden anyway
+    const lazy = shown.length > LIST_MAX_SHEETS;
+    const groups = [], perType = new Map();
+    for (const x of shown) {
+      const g = groups[groups.length - 1];
+      if (g && g.m === x.m) g.xs.push(x); else groups.push({ m: x.m, xs: [x] });
+      const e = perType.get(x.m.type) || { sheets: 0, mods: new Set() };
+      e.sheets++; e.mods.add(x.m.index); perType.set(x.m.type, e);
+    }
+    let lastType = null, rendered = 0;
+    for (const g of groups) {
+      const m = g.m;
+      if (lazy && rendered >= LIST_MAX_MODULES && m !== curMod) continue;
+      rendered++;
+      if (m.type !== lastType) {
+        lastType = m.type;
+        const n = perType.get(lastType);
+        const t = el("div", "group-title");
+        t.append(el("span", "", typeName(lastType)), el("span", "num", `${n.mods.size} modules · ${n.sheets} sheets`));
+        list.append(t);
+      }
+      const box = el("div", "mod" + (m === curMod ? " active" : ""));
+      const head = el("button", "mod-head");
+      const chip = el("span", "chip", m.type || "?"); chip.style.setProperty("--c", `var(--${m.type}, #64748b)`);
+      const name = el("span", "mod-name", m.module); name.append(el("small", "", m.sheets.length > 1 ? `${m.sheets.length} sheets` : "1 sheet"));
+      const meta = el("span", "mod-meta num");
+      if (changedMods.has(m.module)) { const d = el("i", "chg"); d.title = "Changed by the last Excel save"; meta.append(d); }
+      if (m.warnings.length) meta.append(el("span", "w", "!"));
+      meta.append(document.createTextNode(`${m.used}/${m.capacity}`));
+      const ring = el("i", "ring"); ring.style.setProperty("--p", (100 * m.used) / m.capacity); ring.style.setProperty("--c", `var(--${m.type}, #64748b)`);
+      meta.append(ring);
+      meta.title = `${m.used} used, ${m.spare} spare · Excel rows ${m.startRow}–${m.endRow}` + (m.warnings.length ? "\n" + m.warnings.join("\n") : "");
+      head.append(chip, name, meta);
+      head.onclick = () => show(g.xs[0].i);
+      const holder = el("div", "sheets");
+      box.append(head, holder);
+      list.append(box);
+      if (lazy && m !== curMod) continue;   // the sheets of the other modules are hidden: created when the module is opened
+      for (const x of g.xs) {
+        const t = TPL.templates[x.s.template];
+        const b = el("button", "sheet" + (x.i === cur ? " active" : ""));
+        b.append(el("span", "num", `${chText(x.s)} · ${x.s.tbname || "–"}`), el("span", "num", `${t.file.replace(/\.dwg$/i, "")} · p.${x.no}`));
+        b.onclick = () => show(x.i);
+        holder.append(b);
+      }
+    }
+    if (rendered < groups.length) list.append(el("div", "list-empty", `Showing ${rendered} of ${groups.length} modules - search, or pick an IO type above, to find the others.`));
+    const act = list.querySelector(".sheet.active") || list.querySelector(".mod.active");
+    if (act) act.scrollIntoView({ block: "nearest" });
+  }
+
+  // ---------- inspector ----------
+  function renderChannels() {
+    const pane = $("chPane");
+    pane.innerHTML = "";
+    const x = sheets[cur];
+    if (!x) { pane.append(el("div", "list-empty", "The channels of the shown sheet are listed here.")); $("chCount").textContent = "0"; return; }
+    const t = TPL.templates[x.s.template], { base, texts } = sheetTexts(cur);
+    const present = x.s.channels.filter((c) => c && !c.refer && c.tag && !/SPARE/i.test(c.tag));
+    const nEdit = Object.keys(texts).filter((h) => texts[h] !== base[h]).length;
+    $("chCount").textContent = String(t.channels.length);
+
+    const u = el("div", "usage");
+    const title = el("div"); title.innerHTML = `<b>${present.length}</b> of ${t.channels.length} channels used on this sheet`;
+    const bar = el("div", "bar"), used = el("em"); used.style.width = (100 * present.length) / t.channels.length + "%"; used.style.setProperty("--c", `var(--${x.m.type}, #64748b)`);
+    bar.append(used);
+    const leg = el("div", "legend");
+    leg.innerHTML = `<span><i style="background:var(--${x.m.type},#64748b)"></i>Used ${present.length}</span><span><i style="background:var(--line)"></i>Spare ${t.channels.length - present.length}</span>` + (nEdit ? `<span><i style="background:#f59e0b"></i>Edited texts ${nEdit}</span>` : "");
+    u.append(title, bar, leg);
+    pane.append(u);
+
+    t.channels.forEach((ch0, i) => {
+      const ch = x.s.per ? x.s.first : ch0;
+      const c = x.s.channels[i];
+      const spare = !c || /SPARE/i.test(c.tag || "") || (!c.tag && !c.desc);
+      const row = el("div", "ch" + (spare ? " spare" : "") + (focusCh === ch ? " active" : ""));
+      row.append(el("div", "no num", `CH${ch}`));
+      const body = el("div");
+      const tagH = t.tags[i].h, descH = t.descs[i].h;
+      const tag = el("div", "tag", texts[tagH].slice(t.tags[i].prefix.length) || "SPARE");
+      if (c && c.refer) tag.append(el("span", "badge ref", c.refer));
+      if (texts[tagH] !== base[tagH] || texts[descH] !== base[descH]) tag.append(el("span", "badge edit", "edited"));
+      const key = (h) => `${x.m.module}|${sid(x.s)}|${h}`;
+      if (changed.has(key(tagH)) || changed.has(key(descH))) tag.append(el("span", "badge chg", "updated"));
+      body.append(tag, el("div", "desc", texts[descH].slice(t.descs[i].prefix.length)));
+      if (c) {
+        const tm = c.terms || {}, join = (a) => (a || []).filter(Boolean).join("/");
+        body.append(el("div", "meta num", [`Row ${c.row}`, c.tbname || x.s.tbname, join(tm.sys) && `SYS ${join(tm.sys)}`, join(tm.tb) && `TB ${join(tm.tb)}`,
+          c.jb && !/^(NA|-)$/i.test(c.jb) && `${c.jb}${join(tm.jb) ? " " + join(tm.jb) : ""}`, c.c300, c.wire].filter(Boolean).join(" · ")));
+      } else body.append(el("div", "meta", "No Excel row"));
+      row.append(body);
+      row.onclick = () => focusChannel(ch);
+      row.dataset.ch = ch;
+      pane.append(row);
+    });
+  }
+
+  function renderFeed() {
+    const pane = $("feedPane");
+    pane.innerHTML = "";
+    const head = el("div", "feed-head");
+    const live = watch ? "Watching the Excel file — every save is read again and compared." : (book ? "Not watching the file. Import it with the button (Chrome / Edge) to follow Excel saves." : "Import an Excel file.");
+    head.append(el("b", "", watch ? "Live" : "Live update off"), document.createTextNode(live));
+    pane.append(head);
+    if (!feed.length) pane.append(el("div", "list-empty", "Changes made in Excel will appear here, cell by cell."));
+    for (const ev of feed) {
+      const e = el("div", "event");
+      const when = el("div", "when"); when.append(el("span", "", time(ev.at)), el("span", "num", `${ev.sheetsBefore} → ${ev.sheetsAfter} sheets`));
+      e.append(when, el("div", "what", ev.rows.length ? `${ev.rows.length} change${ev.rows.length > 1 ? "s" : ""} ${ev.label || "in Excel"}` : `Saved ${ev.label || ""} — no change on the drawings`));
+      for (const r of ev.rows.slice(0, 30)) {
+        const row = el("div", "row");
+        row.append(el("small", "", `${r.module} · ${r.what}`));
+        const v = el("div");
+        if (r.from || r.to) { v.append(el("del", "", r.from || "(empty)"), document.createTextNode(" → "), el("ins", "", r.to || "(empty)")); row.append(v); }
+        row.onclick = () => {
+          const i = sheets.findIndex((y) => y.m.module === r.module && sid(y.s) === (r.uid || r.template));
+          if (i >= 0) { setView("draw"); show(i); if (r.ch) focusChannel(r.ch); }
+        };
+        e.append(row);
+      }
+      if (ev.rows.length > 30) e.append(el("div", "when", `… and ${ev.rows.length - 30} more`));
+      pane.append(e);
+    }
+    const fc = $("feedCount");
+    fc.textContent = String(unseen || feed.length);
+    fc.classList.toggle("new", unseen > 0);
+    if (book) renderDash();
+  }
+
+  function setTab(id) {
+    document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.pane === id));
+    document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("active", p.id === id));
+    if (id === "feedPane") { unseen = 0; renderFeed(); }
+  }
+  document.querySelectorAll(".tab").forEach((t) => (t.onclick = () => setTab(t.dataset.pane)));
+
+  // ---------- drawing ----------
+  const stage = $("stage");
+  let vb = null, fitW = 0;
+  function setupPaper() {
+    const [x0, y0, x1, y1] = TPL.box;
+    for (const id of ["paper", "bg"]) {
+      $(id).setAttribute("x", x0); $(id).setAttribute("y", -y1);
+      $(id).setAttribute("width", x1 - x0); $(id).setAttribute("height", y1 - y0);
+    }
+  }
+
+  function makeText(info, label) {
+    const e = document.createElementNS(SVGNS, "text");
+    e.setAttribute("font-size", (info.s / CAP).toFixed(2));
+    const anchor = { 0: "start", 1: "middle", 2: "end", 4: "middle" }[info.ha] || "start";
+    let y = info.y;
+    if (info.va === 2 || info.ha === 4) y = info.y - info.s / 2;
+    else if (info.va === 3) y = info.y - info.s;
+    e.setAttribute("x", info.x); e.setAttribute("y", -y);
+    e.setAttribute("text-anchor", anchor);
+    e.setAttribute("xml:space", "preserve");
+    e.dataset.h = info.h;
+    fieldInfo[info.h] = { info, label };
+    els[info.h] = e;
+    return e;
+  }
+
+  function fit(e, info) {
+    e.removeAttribute("textLength"); e.removeAttribute("lengthAdjust");
+    e.setAttribute("font-size", (info.s / CAP).toFixed(2));
+    if (!info.w) return;
+    const room = info.w;
+    let w = 0;
+    try { w = e.getComputedTextLength(); } catch (err) { return; }
+    if (w <= room || room <= 0) return;
+    const sx = Math.max(room / w, MIN_CONDENSE);
+    if (w * sx > room) e.setAttribute("font-size", ((info.s / CAP) * room / (w * sx)).toFixed(2));
+    e.setAttribute("textLength", room.toFixed(1));
+    e.setAttribute("lengthAdjust", "spacingAndGlyphs");
+  }
+
+  let shownTemplate = null;
+  function drawSheet() {
+    const g = $("txt");
+    $("hl").innerHTML = "";
+    if (cur < 0) { g.innerHTML = ""; $("bg").removeAttribute("href"); shownTemplate = null; return; }
+    const x = sheets[cur], t = tplOf(cur);
+    const shownKey = `${TPL.id}/${x.s.template}/${TPL.builtAt}`;
+    if (shownTemplate !== shownKey) {
+      shownTemplate = shownKey;
+      $("bg").setAttribute("href", `data/sets/${TPL.id}/${x.s.template}.svg?v=${TPL.builtAt}`);
+      g.innerHTML = ""; fieldInfo = {};
+      for (const k of Object.keys(els)) delete els[k];
+      const labels = { iop: "IOP (module part no.)", iota: "IOTA part no.", iotype: "IO type", link: "Link no.", module: "Module name", iom: "IOM number",
+                       tbname: "Marshalling TB name", rtpname: "RTP name", sysgroup: "System TB group", jbname: "JB number(s)", chlabel: "Channel no." };
+      for (const [k, f] of Object.entries(t.header)) g.append(makeText(f, labels[k] || k));
+      (t.jblines || []).forEach((f) => g.append(makeText(f, `JB number(s) · line ${f.slot + 1}`)));
+      (t.jbtags || []).forEach((f) => g.append(makeText(f, `${chPre(t, f.ch)}JB name`)));
+      t.tags.forEach((f, i) => g.append(makeText(f, `${chPre(t, t.channels[i])}Field tag`)));
+      t.descs.forEach((f, i) => g.append(makeText(f, `${chPre(t, t.channels[i])}Description`)));
+      for (const f of t.terms) g.append(makeText(f, `${chPre(t, f.ch)}${fieldLabels(t)[f.h].name}`));
+      for (const f of [t.sheetno, t.frameTotal]) if (f) { const e = makeText(f, null); e.style.pointerEvents = "none"; g.append(e); }
+    }
+    const { base, texts } = sheetTexts(cur);
+    for (const [h, v] of Object.entries(texts)) {
+      const e = els[h];
+      if (!e) continue;
+      e.textContent = v;
+      e.classList.toggle("edited", v !== base[h]);
+      e.classList.toggle("changed", changed.has(`${x.m.module}|${sid(x.s)}|${h}`));
+      fit(e, fieldInfo[h].info);
+    }
+    const numText = (f, n) => f.fmt.replace("{}", String(n).padStart(f.digits, "0"));
+    if (t.sheetno) els[t.sheetno.h].textContent = numText(t.sheetno, x.no);
+    if (t.frameTotal) els[t.frameTotal.h].textContent = numText(t.frameTotal, sheets.length);
+    if (focusCh != null) highlight(focusCh, false);
+  }
+
+  function show(i, refit = false) {
+    closeEditor();
+    if (!sheets.length) { cur = -1; drawSheet(); renderHeader(); renderList(); renderChannels(); return; }
+    const next = Math.max(0, Math.min(i, sheets.length - 1));
+    if (next !== cur) focusCh = null;
+    cur = next;
+    drawSheet(); renderHeader(); renderList(); renderChannels();
+    if (refit || !vb) fitView();
+    save();
+  }
+
+  function renderHeader() {
+    const x = sheets[cur];
+    if (!x) {
+      $("sheetTitle").textContent = "No sheet"; $("sheetSub").textContent = "Import an Excel file to start";
+      $("pageLabel").textContent = "– / –"; $("moduleWarn").textContent = "";
+      $("stTemplate").textContent = "Template –"; $("stRows").textContent = "Excel rows –"; $("stEdits").textContent = "Click any text on the sheet to edit it";
+      $("prevBtn").disabled = $("nextBtn").disabled = true;
+      return;
+    }
+    const { m, s } = x, t = TPL.templates[s.template];
+    const h1 = $("sheetTitle"); h1.innerHTML = "";
+    const chip = el("span", "chip", m.type); chip.style.setProperty("--c", `var(--${m.type}, #64748b)`);
+    h1.append(chip, el("span", "t", m.module));
+    const nSheet = m.sheets.indexOf(s) + 1;
+    const sub = $("sheetSub"); sub.innerHTML = "";
+    const pill = (k, v) => { const p = el("span", "pill"); p.append(document.createTextNode(k + " "), el("b", "num", v)); return p; };
+    sub.append(pill("Sheet", `${nSheet}/${m.sheets.length}`), pill("CH", s.first === s.last ? String(s.first) : `${s.first}–${s.last}`), pill("TB", s.tbname || "–"), pill("IOM", m.iom || "–"), pill("Link", m.link || "–"), pill("Used", `${s.used}/${t.channels.length}`));
+    $("pageLabel").textContent = `${x.no} / ${sheets.length}`;
+    $("prevBtn").disabled = cur === 0; $("nextBtn").disabled = cur === sheets.length - 1;
+    $("moduleWarn").textContent = m.warnings.join(" ");
+    $("stTemplate").textContent = `Template ${t.file}`;
+    const rows = s.channels.filter(Boolean).map((c) => c.row);
+    $("stRows").textContent = rows.length ? `Excel rows ${Math.min(...rows)}–${Math.max(...rows)}` : "No Excel rows";
+    const n = Object.keys(sheetEdits(cur)).length;
+    const st = $("stEdits"); st.innerHTML = "";
+    if (n) {
+      st.append(document.createTextNode(`${n} text${n > 1 ? "s" : ""} edited on this sheet · `));
+      const b = el("button", "linkish", "Reset to Excel");
+      b.onclick = () => { delete edits[x.key]; show(cur); toast("Sheet reset to the Excel values"); };
+      st.append(b);
+    } else st.textContent = "Click any text on the sheet to edit it";
+  }
+  function sheetEdits(i) {
+    const { base, texts } = sheetTexts(i);
+    return Object.fromEntries(Object.entries(texts).filter(([h, v]) => v !== base[h]));
+  }
+
+  // ---------- channel focus ----------
+  function highlight(ch, zoom) {
+    const x = sheets[cur], t = x && tplOf(cur);
+    $("hl").innerHTML = "";
+    Object.values(els).forEach((e) => e.classList.remove("focus"));
+    if (!t) return;
+    const i = x.s.per ? (ch === x.s.first ? 0 : -1) : t.channels.indexOf(ch);
+    if (i < 0) return;
+    const a = els[t.tags[i].h], b = els[t.descs[i].h];
+    a.classList.add("focus"); b.classList.add("focus");
+    const ba = a.getBBox(), bb = b.getBBox();
+    const x0 = Math.min(ba.x, bb.x) - 30, y0 = Math.min(ba.y, bb.y) - 24;
+    const x1 = Math.max(ba.x + ba.width, bb.x + bb.width, t.tags[i].limit || 0) + 20, y1 = Math.max(ba.y + ba.height, bb.y + bb.height) + 24;
+    const r = document.createElementNS(SVGNS, "rect");
+    r.setAttribute("x", x0); r.setAttribute("y", y0); r.setAttribute("width", x1 - x0); r.setAttribute("height", y1 - y0);
+    $("hl").append(r);
+    if (zoom) {
+      // Show the channel's whole row: from the controller card to the field text
+      const [bx0, , bx1] = TPL.box;
+      const w = Math.min(bx1 - bx0, Math.max(1900, x1 - x0 + 900));
+      const cx = Math.min(Math.max((x0 + x1) / 2 - w * 0.25, bx0), bx1 - w);
+      const box = stage.getBoundingClientRect(), h = (w * box.height) / box.width;
+      vb = { x: cx, y: (y0 + y1) / 2 - h / 2, w, h };
+      applyVB();
+    }
+  }
+  function focusChannel(ch) {
+    if (cur < 0) return;
+    focusCh = focusCh === ch ? null : ch;
+    closeEditor();
+    if (focusCh == null) { $("hl").innerHTML = ""; Object.values(els).forEach((e) => e.classList.remove("focus")); fitView(); }
+    else highlight(focusCh, true);
+    document.querySelectorAll("#chPane .ch").forEach((r) => r.classList.toggle("active", Number(r.dataset.ch) === focusCh));
+    const act = document.querySelector("#chPane .ch.active");
+    if (act) act.scrollIntoView({ block: "nearest" });
+  }
+
+  // ---------- text editor ----------
+  let editing = null;
+  function openEditor(h) {
+    if (cur < 0 || !fieldInfo[h] || !fieldInfo[h].label) return;
+    const { info, label } = fieldInfo[h];
+    const { base, texts } = sheetTexts(cur);
+    const prefix = info.prefix || "";
+    editing = h;
+    Object.values(els).forEach((e) => e.classList.remove("sel"));
+    els[h].classList.add("sel");
+    $("edLabel").textContent = label;
+    $("edPrefix").textContent = prefix.trim();
+    $("edInput").value = texts[h].startsWith(prefix) ? texts[h].slice(prefix.length) : texts[h];
+    $("edFrom").textContent = "From Excel: " + (base[h].slice(prefix.length) || "(empty)");
+    const ed = $("editor"), box = $("canvas").getBoundingClientRect(), r = els[h].getBoundingClientRect();
+    ed.classList.add("show");
+    const left = Math.min(Math.max(8, r.left - box.left), box.width - ed.offsetWidth - 8);
+    let top = r.bottom - box.top + 8;
+    if (top + ed.offsetHeight > box.height - 8) top = Math.max(8, r.top - box.top - ed.offsetHeight - 8);
+    ed.style.left = left + "px"; ed.style.top = top + "px";
+    $("edInput").focus(); $("edInput").select();
+  }
+  function closeEditor() {
+    $("editor").classList.remove("show");
+    if (editing && els[editing]) els[editing].classList.remove("sel");
+    editing = null;
+  }
+  function applyEdit(value) {
+    const h = editing, x = sheets[cur];
+    if (!h || !x) return;
+    const { base } = sheetTexts(cur);
+    const prefix = fieldInfo[h].info.prefix || "";
+    const full = value === null ? base[h] : prefix + value.replace(/\s+/g, " ").trim();
+    edits[x.key] ||= {};
+    if (full === base[h]) delete edits[x.key][h]; else edits[x.key][h] = { v: full, base: base[h] };
+    if (!Object.keys(edits[x.key]).length) delete edits[x.key];
+    closeEditor(); drawSheet(); renderHeader(); renderChannels(); save();
+  }
+  $("txt").addEventListener("click", (e) => { const t = e.target.closest("text"); if (t) { e.stopPropagation(); openEditor(t.dataset.h); } });
+  $("edApply").onclick = () => applyEdit($("edInput").value);
+  $("edReset").onclick = () => applyEdit(null);
+  $("edCancel").onclick = closeEditor;
+  $("edInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") applyEdit($("edInput").value);
+    if (e.key === "Escape") closeEditor();
+  });
+
+  // ---------- pan / zoom ----------
+  function applyVB() {
+    stage.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+    const r = stage.getBoundingClientRect();
+    if (TPL && r.width) {
+      const [x0, y0, x1, y1] = TPL.box;
+      const fitScale = Math.min(r.width / (x1 - x0 + 60), r.height / (y1 - y0 + 60));
+      const scale = Math.min(r.width / vb.w, r.height / vb.h);
+      $("zoomLabel").textContent = Math.round((100 * scale) / fitScale) + "%";
+    }
+  }
+  function fitView() {
+    if (!TPL) return;
+    const [x0, y0, x1, y1] = TPL.box, pad = 30;
+    vb = { x: x0 - pad, y: -y1 - pad, w: x1 - x0 + 2 * pad, h: y1 - y0 + 2 * pad };
+    stage.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    applyVB();
+  }
+  function fitWidth() {
+    if (!TPL) return;
+    const [x0, , x1, y1] = TPL.box, r = stage.getBoundingClientRect(), w = x1 - x0 + 40;
+    vb = { x: x0 - 20, y: -y1 - 20, w, h: (w * r.height) / r.width };
+    applyVB();
+  }
+  function zoomAt(f, cx, cy) {
+    if (!vb) return;
+    closeEditor();
+    const r = stage.getBoundingClientRect();
+    const s = Math.max(vb.w / r.width, vb.h / r.height);
+    const ox = vb.x + (vb.w - r.width * s) / 2, oy = vb.y + (vb.h - r.height * s) / 2;
+    const px = ox + (cx - r.left) * s, py = oy + (cy - r.top) * s;
+    const nw = Math.min(Math.max(vb.w * f, 250), 16000), k = nw / vb.w;
+    vb = { x: px - (px - vb.x) * k, y: py - (py - vb.y) * k, w: nw, h: vb.h * k };
+    applyVB();
+  }
+  stage.addEventListener("wheel", (e) => { if (!vb) return; e.preventDefault(); zoomAt(e.deltaY > 0 ? 1.15 : 1 / 1.15, e.clientX, e.clientY); }, { passive: false });
+  let drag = null;
+  stage.addEventListener("pointerdown", (e) => {
+    if (!vb || e.target.tagName === "text") return;
+    closeEditor();
+    drag = { x: e.clientX, y: e.clientY, vx: vb.x, vy: vb.y };
+    stage.setPointerCapture(e.pointerId); stage.classList.add("drag");
+  });
+  stage.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const r = stage.getBoundingClientRect(), s = Math.max(vb.w / r.width, vb.h / r.height);
+    vb.x = drag.vx - (e.clientX - drag.x) * s; vb.y = drag.vy - (e.clientY - drag.y) * s;
+    applyVB();
+  });
+  const endDrag = () => { drag = null; stage.classList.remove("drag"); };
+  stage.addEventListener("pointerup", endDrag);
+  stage.addEventListener("pointercancel", endDrag);
+  stage.addEventListener("dblclick", (e) => { if (e.target.tagName !== "text") zoomAt(1 / 2, e.clientX, e.clientY); });
+  const centerZoom = (f) => { if (!vb) return; const r = stage.getBoundingClientRect(); zoomAt(f, r.left + r.width / 2, r.top + r.height / 2); };
+  $("zoomIn").onclick = () => centerZoom(1 / 1.4);
+  $("zoomOut").onclick = () => centerZoom(1.4);
+  $("zoomLabel").onclick = fitView;
+  $("fitWBtn").onclick = fitWidth;
+  new ResizeObserver(() => { if (vb) applyVB(); }).observe(stage);
+
+  // ---------- panels ----------
+  let ui = { side: true, insp: true, view: "dash" };
+  function applyUI() {
+    const narrow = matchMedia("(max-width: 1400px)").matches;
+    document.body.classList.toggle("no-side", !ui.side);
+    document.body.classList.toggle("no-insp", !ui.insp && !narrow);
+    document.body.classList.toggle("insp-open", ui.insp && narrow);
+    $("inspBtn").classList.toggle("on", ui.insp);
+  }
+  $("sideBtn").onclick = () => { ui.side = !ui.side; applyUI(); save(); };
+  $("inspBtn").onclick = () => { ui.insp = !ui.insp; applyUI(); save(); };
+  matchMedia("(max-width: 1400px)").addEventListener("change", applyUI);
+
+  // ---------- import + live watch ----------
+  let watch = null, pending = null;
+  function setLive(state, text, title) {
+    const b = $("liveBadge");
+    b.className = "live" + (state ? " show" : "") + (state === "on" ? " on" : "") + (state === "wait" ? " wait" : "");
+    b.querySelector("span").textContent = text || "";
+    b.title = title || "";
+  }
+  async function analyse(file) {
+    if (!activeSet) throw new Error("no template set is built yet - import the template drawings first (Templates page)");
+    const res = await fetch(`/api/io?name=${encodeURIComponent(file.name)}&set=${encodeURIComponent(activeSet)}`, { method: "POST", body: await file.arrayBuffer() });
+    let data;
+    try { data = await res.json(); } catch (e) { throw new Error(res.statusText || "bad reply from the server"); }
+    if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+    if (!data.modules.length) throw new Error("No IO rows found under the header row.");
+    // The templates were built again (e.g. the program was restarted with a newer version): use the new data at once
+    if (data.setBuilt && TPL && data.set === activeSet && data.setBuilt !== TPL.builtAt) await loadTemplates(activeSet);
+    data.readAt = Date.now(); data.modified = file.lastModified; data.size = file.size;
+    lastFile = file;
+    return data;
+  }
+  function useBook(data, keepEdits, label) {
+    const key = sheets[cur] && sheets[cur].key;
+    const before = book, sheetsBefore = sheets.length;
+    const rows = before && before.file === data.file ? diffBooks(before, data) : [];
+    book = data;
+    if (!keepEdits) edits = {};
+    buildSheets();
+    if (before && before.file === data.file && label) {
+      changed = new Set(rows.filter((r) => r.handle).map((r) => `${r.module}|${r.uid || r.template}|${r.handle}`));
+      feed.unshift({ at: Date.now(), label, rows: rows.slice(0, 300), sheetsBefore, sheetsAfter: sheets.length });
+      feed = feed.slice(0, 40);
+      if (rows.length && !$("feedPane").classList.contains("active")) unseen += 1;
+    } else changed = new Set();
+    if (filter !== "ALL" && !sheets.some((x) => x.m.type === filter)) filter = "ALL";
+    renderSource(); renderTabs(); renderFeed();
+    // After an Excel save jump to the first changed sheet, unless the shown one changed too
+    let i = sheets.findIndex((x) => x.key === key);
+    const first = rows.find((r) => r.handle);
+    if (label && first && !(i >= 0 && [...changed].some((k) => k.startsWith(`${sheets[i].m.module}|${sid(sheets[i].s)}|`)))) {
+      const j = sheets.findIndex((x) => x.m.module === first.module && sid(x.s) === (first.uid || first.template));
+      if (j >= 0) i = j;
+    }
+    show(i >= 0 ? i : 0, i < 0);
+    return rows;
+  }
+  let waiting = null;   // an Excel file picked while no template set exists: read after the templates are imported
+  async function importFile(file, handle, keepEdits = false, label = "") {
+    if (!activeSet) {
+      waiting = { file, handle };
+      setView("templates");
+      toast(`Import the template DWG files first (frame + loop templates). ${file.name} is read as soon as they are ready.`, "", 9000);
+      return;
+    }
+    toast(`Reading ${file.name}…`, "", 0);
+    try {
+      const data = await analyse(file);
+      stopWatch();
+      const rows = useBook(data, keepEdits, label);
+      if (label) toast(rows.length ? `${rows.length} change${rows.length > 1 ? "s" : ""} ${label}` : `${file.name} read — drawings are up to date`, "ok", 4000);
+      else toast(`${file.name}: ${data.dataRows} rows → ${data.modules.length} modules → ${sheets.length} sheets`, "ok", 4000);
+      if (handle) startWatch(handle, file);
+      else { idb.set("handle", undefined); setLive("off", "Not live", "Opened without a file link: use Import Excel in Chrome / Edge to follow saves"); }
+    } catch (e) {
+      toast("Could not read the Excel file: " + e.message, true, 9000);
+      if (e instanceof TypeError) $("offline").style.display = "block";
+    }
+  }
+  function startWatch(handle, file) {
+    watch = { handle, lastModified: file.lastModified, size: file.size, busy: false, checked: Date.now() };
+    watch.timer = setInterval(checkWatch, LIVE_MS);
+    idb.set("handle", handle);
+    pending = null;
+    liveLabel();
+    renderFeed();
+  }
+  function liveLabel() {
+    if (!watch) return;
+    setLive("on", `Live · ${time(book && book.readAt || Date.now())}`, `Watching ${book ? book.file : "the Excel file"} — checked every ${LIVE_MS / 1000} s, last read ${time(book.readAt)}`);
+  }
+  function stopWatch() { if (watch) clearInterval(watch.timer); watch = null; }
+  async function checkWatch() {
+    const w = watch;
+    if (!w || w.busy) return;
+    w.busy = true;
+    try {
+      const file = await w.handle.getFile();
+      w.checked = Date.now();
+      if (file.lastModified === w.lastModified && file.size === w.size) return;
+      const data = await analyse(file);      // Excel may still be saving: an error just retries next tick
+      if (watch !== w) return;
+      w.lastModified = file.lastModified; w.size = file.size;
+      const rows = useBook(data, true, "from Excel save");
+      liveLabel();
+      toast(rows.length ? `Excel saved — ${rows.length} change${rows.length > 1 ? "s" : ""} applied to the drawings` : "Excel saved — no change on the drawings", "ok", 4000);
+    } catch (e) {
+      if (e.name === "NotFoundError" || e.name === "NotAllowedError") { stopWatch(); setLive("wait", "Reconnect live", "The file moved or permission was withdrawn — click to pick it again"); pending = null; }
+    } finally { w.busy = false; }
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) checkWatch(); });
+
+  async function reconnect(handle) {
+    try {
+      let p = await handle.queryPermission({ mode: "read" });
+      if (p !== "granted") p = await handle.requestPermission({ mode: "read" });
+      if (p !== "granted") return toast("Permission to read the Excel file was not given", true);
+      await importFile(await handle.getFile(), handle, true, "since last session");
+    } catch (e) {
+      toast("The linked Excel file could not be opened: " + e.message, true, 7000);
+      idb.set("handle", undefined); pickExcel();
+    }
+  }
+  $("liveBadge").onclick = () => {
+    if (pending) reconnect(pending);
+    else if (!watch) pickExcel();
+    else if (ui.view !== "draw") setView("live");
+    else { ui.insp = true; applyUI(); setTab("feedPane"); }
+  };
+
+  async function pickExcel() {
+    if (window.showOpenFilePicker) {
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          types: [{ description: "Excel IO assignment", accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx", ".xlsm"] } }],
+          multiple: false,
+        });
+        const file = await handle.getFile();
+        const same = book && book.file === file.name;
+        return importFile(file, handle, same, same ? "since the last import" : "");
+      } catch (e) { if (e.name === "AbortError") return; }
+    }
+    $("xlsx").click();
+  }
+  // ---------- clear data ----------
+  // Removes everything that came from an Excel import: the workbook and its sheets, the edited texts, the live
+  // changes, the link to the Excel file and what the browser remembered. Template sets stay (Templates page).
+  async function clearData() {
+    const nEdits = Object.values(edits).reduce((a, e) => a + Object.keys(e).length, 0);
+    const nSets = SETS.length;
+    const what = [book && `the imported workbook (${book.file}: ${book.modules.length} modules, ${sheets.length} sheets)`, nEdits && `${nEdits} edited text${nEdits > 1 ? "s" : ""}`,
+                  feed.length && "the live changes", nSets && `ALL ${nSets} template set${nSets > 1 ? "s" : ""} with their DWG files and frame`,
+                  "the saved view and the link to the Excel file"].filter(Boolean);
+    const text = "Clear all data?"+"\n\n"+"\u2022 " + what.join("\n\u2022 ") + "\n\nThis cannot be undone. The Excel file itself is not touched; import the template DWG files again to continue.";
+    if (!confirm(text)) return;
+    toast("Clearing… (waits until a running template build is ready)", "", 0);
+    let tplError = "";  // the data of this page is cleared in any case; a failing template delete is reported at the end
+    try { if (nSets) await post("/api/templates/clear", ""); }
+    catch (e) { tplError = e.message; }
+    closeEditor();
+    stopWatch(); pending = null; lastFile = null;
+    await idb.set("handle", undefined);
+    book = null; sheets = []; cur = -1; edits = {}; feed = []; changed = new Set(); focusCh = null; unseen = 0; vb = null;
+    filter = "ALL"; query = ""; $("search").value = ""; $("xlsx").value = ""; tplLog = [];
+    ui.view = "dash";
+    try { localStorage.removeItem(STORE); } catch (e) {}
+    setLive("", "");
+    try { await loadTemplates(""); } catch (e) {}
+    shownTemplate = null;
+    renderSource(); renderTabs(); renderFeed();
+    show(0, true);
+    setView("dash");
+    renderDash();
+    if (tplError) toast("Excel data cleared, but the template sets could not be deleted: " + tplError + " — press Clear data again in a minute", true, 9000);
+    else toast("All data cleared — import the template DWG files (Templates page) and the Excel file to start again", "ok", 5000);
+  }
+  $("clearBtn").onclick = clearData;
+  $("importBtn").onclick = pickExcel;
+  $("importBtn2").onclick = pickExcel;
+  $("xlsx").onchange = (e) => { if (e.target.files[0]) importFile(e.target.files[0], null); e.target.value = ""; };
+  let depth = 0;
+  const isFiles = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
+  document.addEventListener("dragenter", (e) => { if (isFiles(e)) { depth++; document.body.classList.add("dragover"); } });
+  document.addEventListener("dragleave", () => { if (--depth <= 0) { depth = 0; document.body.classList.remove("dragover"); } });
+  document.addEventListener("dragover", (e) => { if (isFiles(e)) e.preventDefault(); });
+  document.addEventListener("drop", async (e) => {
+    if (!isFiles(e)) return;
+    e.preventDefault(); depth = 0; document.body.classList.remove("dragover");
+    const dwgs = [...e.dataTransfer.files].filter((f) => /\.dwg$/i.test(f.name));
+    if (dwgs.length) return importDwgs(dwgs);
+    const item = [...e.dataTransfer.items].find((it) => it.kind === "file");
+    if (!item) return;
+    const hp = item.getAsFileSystemHandle ? item.getAsFileSystemHandle().catch(() => null) : Promise.resolve(null);
+    const file = item.getAsFile(), handle = await hp;
+    if (!file || !/\.(xlsx|xlsm)$/i.test(file.name)) return toast("Drop an .xlsx / .xlsm workbook or the template .dwg files", true);
+    const same = book && book.file === file.name;  // the same workbook again: keep edits and list what changed
+    importFile(file, handle && handle.kind === "file" ? handle : null, same, same ? "since the last import" : "");
+  });
+
+  // ---------- download ----------
+  function scopes() {
+    const x = sheets[cur], out = [{ id: "all", label: "Complete set", list: sheets }];
+    for (const t of typeOrder()) {
+      const list = sheets.filter((y) => y.m.type === t);
+      if (list.length) out.push({ id: t, label: `${t} only — ${typeName(t)}`, list });
+    }
+    if (x) {
+      out.push({ id: "module", label: `This module — ${x.m.module}`, list: sheets.filter((y) => y.m === x.m) });
+      out.push({ id: "sheet", label: `This sheet — ${x.m.module} ${chText(x.s)}`, list: [x] });
+    }
+    return out;
+  }
+  const baseName = () => (book && book.file ? book.file.replace(/\.[^.]+$/, "") : "Loop drawings");
+  const sheetFileName = (x) => `${String(x.no).padStart(3, "0")} ${x.m.module} ${x.s.first === x.s.last ? "CH" + x.s.first : `CH${x.s.first}-${x.s.last}`}`;
+  const dlFormat = () => (document.querySelector("input[name=fmt]:checked") || {}).value || "pdf";
+
+  function dialogHint() {
+    const fmt = dlFormat(), sc = scopes().find((s) => s.id === ($("dlChoices").querySelector("input:checked") || {}).value);
+    const n = sc ? sc.list.length : 0;
+    const files = Math.ceil(n / DIRECT_MAX.pdf);
+    $("dlHint").textContent = fmt === "pdf" ? (n > DIRECT_MAX.pdf ? `${n.toLocaleString()} A1 pages: ${files} PDF files of up to ${DIRECT_MAX.pdf} sheets, in one ZIP.` : "One PDF with one A1 page per sheet.")
+      : `One ${fmt.toUpperCase()} drawing per sheet, frame included` + (n > 1 ? ` — ${n.toLocaleString()} files in one ZIP.` : ".") + (fmt === "dwg" ? " AutoCAD 2000 format, opens in every AutoCAD version." : "")
+        + (n > 20000 ? " A very big set takes a long time (all CPU cores are used); the page must stay open." : "");
+    $("dlGo").lastChild.textContent = fmt === "pdf" ? (n > DIRECT_MAX.pdf ? `Download ZIP (${files} PDFs)` : "Download PDF") : n > 1 ? `Download ZIP (${n.toLocaleString()})` : `Download ${fmt.toUpperCase()}`;
+  }
+  function openDownload(fmt, scope) {
+    if (!sheets.length) return;
+    if (fmt) document.querySelector(`input[name=fmt][value=${fmt}]`).checked = true;
+    const box = $("dlChoices"); box.innerHTML = "";
+    const list = scopes(), pre = scope && list.some((s) => s.id === scope) ? scope : filter !== "ALL" && list.some((s) => s.id === filter) ? filter : "all";
+    for (const sc of list) {
+      const lab = el("label", "choice");
+      const r = el("input"); r.type = "radio"; r.name = "scope"; r.value = sc.id; r.checked = sc.id === pre;
+      r.onchange = () => { $("dlName").value = `${baseName()} - Loop drawings${sc.id === "all" ? "" : " - " + (sc.id === "module" || sc.id === "sheet" ? sc.list[0].m.module : sc.id)}`; dialogHint(); };
+      lab.append(r, el("span", "", sc.label), el("span", "num", `${sc.list.length} sheet${sc.list.length > 1 ? "s" : ""}`));
+      box.append(lab);
+    }
+    box.querySelector("input:checked").onchange();
+    $("dlState").textContent = "";
+    $("dlDialog").showModal();
+  }
+  document.querySelectorAll("input[name=fmt]").forEach((r) => (r.onchange = dialogHint));
+  $("downloadBtn").onclick = () => openDownload();
+
+  // Up to these many sheets are made in one request; more go through an export job (any number, 100 000 and more):
+  // the sheets are sent in parts, drawn by all CPU cores of the server, and come back as one ZIP streamed from disk.
+  const DIRECT_MAX = { pdf: 1000, dwg: 50, dxf: 50 };
+  const CAD_PART = 100;
+  const dlJob = { cancelled: false, done: 0, id: null };
+  const sheetItem = (x, k, n, global) => ({
+    template: x.s.template, texts: sheetTexts(x.i).texts, name: sheetFileName(x),
+    sheet: global ? x.no : k + 1, total: global ? sheets.length : n,
+  });
+  const saveAs = (href, name) => {
+    const a = document.createElement("a");
+    a.href = href; a.download = name;
+    document.body.append(a); a.click(); a.remove();
+  };
+  async function download(list, fmt, filename, global = true) {
+    const n = list.length, title = `${baseName()} - Loop drawings`;
+    dlJob.cancelled = false; dlJob.done = 0; dlJob.id = null;
+    if (n > DIRECT_MAX[fmt]) return downloadBig(list, fmt, filename, global, title);
+    const items = list.map((x, k) => sheetItem(x, k, n, global));
+    const res = await fetch(fmt === "pdf" ? "/api/pdf" : "/api/cad", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ set: activeSet, items, format: fmt, filename, title }) });
+    if (!res.ok) { let msg = res.statusText; try { msg = (await res.json()).error || msg; } catch (e) {} throw new Error(msg); }
+    const blob = await res.blob();
+    const cd = res.headers.get("Content-Disposition") || "";
+    const star = cd.match(/filename\*=UTF-8''([^;]+)/);
+    const name = star ? decodeURIComponent(star[1]) : `loop_drawings.${fmt}`;
+    const url = URL.createObjectURL(blob);
+    saveAs(url, name);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    return name;
+  }
+  async function downloadBig(list, fmt, filename, global, title) {
+    const n = list.length;
+    const job = await post(`/api/export/start?kind=${fmt}&filename=${encodeURIComponent(filename)}`, "");
+    dlJob.id = job.job;
+    const part = fmt === "pdf" ? job.part : CAD_PART, parts = Math.ceil(n / part);
+    let next = 0, failure = null;
+    const worker = async () => {
+      while (!failure && !dlJob.cancelled) {
+        const k = next++;
+        if (k >= parts) return;
+        const from = k * part, to = Math.min(n, from + part), items = [];
+        for (let i = from; i < to; i++) items.push(sheetItem(list[i], i, n, global));
+        const no = (v) => String(v).padStart(6, "0");
+        const stem = `${filename} ${no(items[0].sheet)}-${no(items[items.length - 1].sheet)}`;
+        try {
+          await post(`/api/export/add?job=${job.job}&stem=${encodeURIComponent(stem)}`, JSON.stringify({ set: activeSet, items, title }));
+          dlJob.done += to - from;
+        } catch (e) { failure = e; }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(job.workers, parts) }, worker));
+    if (failure || dlJob.cancelled) {
+      post(`/api/export/cancel?job=${job.job}`, "").catch(() => {});
+      if (failure) throw failure;
+      throw new Error("cancelled");
+    }
+    const fin = await post(`/api/export/finish?job=${job.job}`, "");
+    saveAs(`/api/export/get?job=${job.job}`, fin.name);   // a normal download: the browser streams the ZIP to disk
+    dlJob.id = null;
+    return `${fin.name} (${fin.files} files, ${(fin.size / 1e6).toFixed(0)} MB)`;
+  }
+  $("dlDialog").addEventListener("close", () => {   // Cancel / Esc while parts are still being made: stop and delete the export
+    if (dlJob.id) { dlJob.cancelled = true; post(`/api/export/cancel?job=${dlJob.id}`, "").catch(() => {}); }
+  });
+  $("dlGo").onclick = async (ev) => {
+    ev.preventDefault();
+    const id = ($("dlChoices").querySelector("input:checked") || {}).value;
+    const sc = scopes().find((s) => s.id === id);
+    if (!sc) return;
+    const fmt = dlFormat(), btn = $("dlGo"), n = sc.list.length;
+    btn.disabled = true; btn.classList.add("busy");
+    const t0 = Date.now();
+    const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+    const tick = setInterval(() => {
+      const s = (Date.now() - t0) / 1000;
+      $("dlState").textContent = n > DIRECT_MAX[fmt]
+        ? `Generating ${dlJob.done.toLocaleString()} / ${n.toLocaleString()} ${fmt.toUpperCase()} sheets… ${mmss(s)}` + (dlJob.done ? ` · about ${mmss((s / dlJob.done) * (n - dlJob.done))} left` : "")
+        : `Generating ${n} ${fmt.toUpperCase()} sheet${n > 1 ? "s" : ""}… ${Math.round(s)} s`;
+    }, 500);
+    try {
+      const name = await download(sc.list, fmt, $("dlName").value, $("dlGlobal").checked);
+      $("dlDialog").close();
+      toast(`Downloaded ${name} — ${n.toLocaleString()} sheet${n > 1 ? "s" : ""}`, "ok", 6000);
+    } catch (e) {
+      if (dlJob.cancelled) return;
+      $("dlState").textContent = "Failed: " + e.message;
+      if (e instanceof TypeError) $("offline").style.display = "block";
+    } finally { clearInterval(tick); btn.disabled = false; btn.classList.remove("busy"); }
+  };
+  $("dwgBtn").onclick = async () => {
+    const x = sheets[cur];
+    if (!x) return;
+    const b = $("dwgBtn");
+    b.disabled = true;
+    toast(`Making the DWG of ${x.m.module} ${chText(x.s)}…`, "", 0);
+    try { toast(`Downloaded ${await download([x], "dwg", sheetFileName(x))}`, "ok", 4000); }
+    catch (e) { toast("DWG failed: " + e.message, true, 8000); }
+    finally { b.disabled = false; }
+  };
+
+  // ---------- views + dashboard ----------
+  const VIEWS = ["dash", "draw", "modules", "checks", "live", "templates", "downloads"];
+  function setView(v, persist = true) {
+    if (!VIEWS.includes(v)) v = "dash";
+    const changedView = ui.view !== v;
+    ui.view = v;
+    document.body.classList.toggle("view-draw", v === "draw");
+    document.querySelectorAll(".page").forEach((p) => p.classList.toggle("active", p.id === "page-" + v));
+    document.querySelectorAll(".nav button[data-view]").forEach((b) => b.classList.toggle("active", b.dataset.view === v));
+    if (changedView && $("page-" + v)) $("page-" + v).scrollTop = 0;
+    if (v === "draw") requestAnimationFrame(() => { if (cur >= 0) { drawSheet(); if (focusCh == null) fitView(); else highlight(focusCh, true); } });
+    if (persist) save();
+  }
+  document.querySelectorAll(".nav button[data-view]").forEach((b) => (b.onclick = () => setView(b.dataset.view)));
+  function openModule(m, ch) {
+    const i = sheets.findIndex((x) => x.m === m);
+    if (i < 0) return;
+    if (filter !== "ALL" && filter !== m.type) { filter = "ALL"; renderTabs(); }
+    setView("draw");
+    show(i, true);
+    if (ch) focusChannel(ch);
+  }
+
+  const ICONS = {
+    module: '<path d="M4 4h16v16H4z"/><path d="M9 9h6v6H9zM9 1v3M15 1v3M9 20v3M15 20v3"/>',
+    sheet: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M8 13h8M8 17h5"/>',
+    gauge: '<path d="M12 14l4-4"/><path d="M3.3 19a10 10 0 1 1 17.4 0"/>',
+    rows: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/>',
+    spare: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
+    check: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>',
+    ok: '<path d="M20 6 9 17l-5-5"/>',
+    bars: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    table: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/>',
+    pulse: '<path d="M22 12h-4l-3 8-6-16-3 8H2"/>',
+    download: '<path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>',
+    arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    link: '<path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>',
+  };
+  const icon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg>`;
+  const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);
+  let sparkId = 0;
+  function spark(values, color) {
+    if (values.length < 2) return "";
+    const max = values.reduce((a, v) => (v > a ? v : a), 1), n = values.length, id = "sp" + ++sparkId;
+    const pts = values.map((v, i) => [(100 * i) / (n - 1), 38 - (34 * v) / max]);
+    const line = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(2) + " " + p[1].toFixed(2)).join(" ");
+    return `<svg class="spark" viewBox="0 0 100 40" preserveAspectRatio="none"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".22"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs><path d="${line} L100 40 L0 40Z" fill="url(#${id})"/><path d="${line}" fill="none" stroke="${color}" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`;
+  }
+  function donut(p, color) {
+    const c = 2 * Math.PI * 40;
+    return `<svg class="donut" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="#eef2f7" stroke-width="10"/><circle cx="50" cy="50" r="40" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${(c * p) / 100} ${c}" transform="rotate(-90 50 50)"/><text x="50" y="56" text-anchor="middle" font-size="18" font-weight="700" fill="#0f172a">${p}%</text></svg>`;
+  }
+  const typeColor = (t) => getComputedStyle(document.documentElement).getPropertyValue("--" + t).trim() || "#64748b";
+  const emptyBlock = (title, text) => `<div class="dash-empty">${icon("sheet").replace("<svg", '<svg width="42" height="42" style="color:#2563eb"')}<h3>${title}</h3><p>${text}</p><button class="btn primary" data-import>Import Excel</button></div>`;
+  const wireImport = (root) => root.querySelectorAll("[data-import]").forEach((b) => (b.onclick = pickExcel));
+  const wireGo = (root) => root.querySelectorAll("[data-go]").forEach((b) => (b.onclick = () => setView(b.dataset.go)));
+  const allIssues = () => !book ? [] : [
+    ...book.warnings.map((w) => ({ m: null, w })),
+    ...book.modules.filter((m) => m.warnings.length).flatMap((m) => m.warnings.map((w) => ({ m, w }))),
+  ];
+  const changeRows = () => feed.flatMap((ev) => ev.rows.map((r) => ({ ...r, at: ev.at })));
+  function openChange(r) {
+    const m = book && book.modules.find((x) => x.module === r.module);
+    if (m) openModule(m, r.ch);
+  }
+  let modType = "";
+
+  // Every page is rendered from the same book; called whenever the book or the live feed changes
+  function renderDash() {
+    const issues = allIssues(), nWarn = issues.length;
+    $("navSheets").textContent = sheets.length || "";
+    $("navMods").textContent = book ? book.modules.length : "";
+    $("navWarn").textContent = nWarn || "";
+    $("navLive").textContent = feed.length ? feed.reduce((a, e) => a + e.rows.length, 0) || "" : "";
+    $("navFile").textContent = book ? book.file : "No workbook";
+    $("navFile").title = book ? book.file : "";
+    $("navRead").textContent = book ? (watch ? "● Live · " : "") + `read ${time(book.readAt || Date.now())}` : "Import an IO assignment";
+    renderDashPage(issues);
+    renderModulesPage();
+    renderChecksPage(issues);
+    renderLivePage();
+    renderTemplatesPage();
+    renderDownloadsPage();
+  }
+
+  function typeRows() {
+    const mods = book.modules;
+    const types = [...TYPES, ...new Set(mods.map((m) => m.type).filter((t) => !TYPES.includes(t)))];
+    return types.map((t) => {
+      const ms = mods.filter((m) => m.type === t);
+      const u = ms.reduce((a, m) => a + m.used, 0), c = ms.reduce((a, m) => a + m.capacity, 0);
+      return { t, ms, used: u, cap: c, sheets: sheets.filter((x) => x.m.type === t).length };
+    }).filter((r) => r.ms.length);
+  }
+
+  function renderDashPage(issues) {
+    const body = $("dashBody");
+    if (!book) {
+      $("dashSub").textContent = "IO assignment overview · generated drawing set";
+      $("dashRight").innerHTML = "";
+      body.innerHTML = emptyBlock("No IO assignment imported", "Import the IO ASSIGNMENT workbook. Every figure on this dashboard is read from that file, and it stays linked for live updates.");
+      wireImport(body);
+      return;
+    }
+    const mods = book.modules, nWarn = issues.length;
+    const used = mods.reduce((a, m) => a + m.used, 0), cap = mods.reduce((a, m) => a + m.capacity, 0);
+    const byType = typeRows();
+    const ordered = [...mods].sort((a, b) => a.index - b.index);
+    const running = (f) => { let t = 0; return [0, ...ordered.map((m) => (t += f(m)))]; };  // curve over the modules in Excel order
+    const maxCap = Math.max(...byType.map((r) => r.cap), 1);
+
+    $("dashSub").textContent = `${book.file} · sheet “${book.sheet}” · header row ${book.headerRow}`;
+    $("dashRight").innerHTML = `<div><b>${watch ? '<span style="color:var(--ok)">● Live</span> · ' : ""}Read ${time(book.readAt || Date.now())}</b>${book.modified ? "Excel saved " + new Date(book.modified).toLocaleString([], { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : ""}</div>`;
+
+    const kpi = (color, ico, label, value, sub, visual = "", go = "") =>
+      `<div class="kpi${go ? " click" : ""}" style="--k:${color}"${go ? ` data-go="${go}"` : ""}><div class="kpi-grid"><div><div class="kpi-top"><span class="ico">${icon(ico)}</span><label>${label}</label></div><div class="v num">${value}</div><div class="s">${sub}</div></div>${visual ? `<div class="kpi-vis">${visual}</div>` : ""}</div></div>`;
+    const stack = `<div class="stack">${byType.map((r) => `<div><span>${r.t}</span><i><em style="width:${pct(r.sheets, sheets.length)}%;--c:${typeColor(r.t)}"></em></i><span class="num">${r.sheets}</span></div>`).join("")}</div>`;
+
+    const issueHtml = issues.slice(0, 4).map((x, i) => `<div class="issue" data-issue="${i}">${icon("check")}<div><b>${x.m ? `${esc(x.m.module)} · rows ${x.m.startRow}–${x.m.endRow}` : "Workbook"}</b><span>${esc(x.w)}</span></div>${x.m ? "<em>Open →</em>" : ""}</div>`).join("");
+    const recent = changeRows().slice(0, 6);
+    const recentHtml = recent.map((r, i) => `<div class="chg-row" data-chg="${i}"><time class="num">${time(r.at).slice(0, 5)}</time><div><b>${esc(r.module)} · ${esc(r.what)}</b>${r.from || r.to ? `<div><del>${esc(r.from || "(empty)")}</del> → <ins>${esc(r.to || "(empty)")}</ins></div>` : ""}</div></div>`).join("");
+
+    body.innerHTML = `<div class="kpis">
+      ${kpi("#2563eb", "module", "IO modules", mods.length, `${byType.length} IO types · ${book.mode === "yellow" ? "split at yellow rows" : "split by module name"}`, spark(running((m) => m.used), "#2563eb"), "modules")}
+      ${kpi("#7c3aed", "sheet", "Drawing sheets", sheets.length, "A1 loop drawings, frame included", stack, "draw")}
+      ${kpi("#0d9488", "gauge", "Channel utilisation", `${used}<small>/ ${cap}</small>`, `${cap - used} spare channels`, donut(pct(used, cap), "#0d9488"))}
+      ${kpi("#0f766e", "rows", "Excel IO rows", book.dataRows, `Rows ${mods.reduce((a, m) => Math.min(a, m.startRow), Infinity)}–${mods.reduce((a, m) => Math.max(a, m.endRow), 0)} of “${esc(book.sheet)}”`, spark(running((m) => m.rows), "#0f766e"))}
+      ${kpi("#ea580c", "spare", "Spare channels", cap - used, `${pct(cap - used, cap)}% free for expansion`, spark(running((m) => m.spare), "#ea580c"))}
+      ${nWarn ? kpi("#d97706", "check", "Data checks", nWarn, ((n) => `${n} module${n === 1 ? "" : "s"} need${n === 1 ? "s" : ""} a look`)(new Set(issues.filter((x) => x.m).map((x) => x.m)).size), "", "checks") : kpi("#16a34a", "ok", "Data checks", "OK", "No issues found in the workbook", "", "checks")}
+    </div>
+    <div class="cards">
+      <div class="card"><div class="card-head"><h3>${icon("bars")}IO distribution</h3><span class="spacer"></span><span class="note num">${used} used of ${cap}</span></div><div class="card-body">
+        <div class="dist">${byType.map((r) => `<b style="color:${typeColor(r.t)}">${r.t}</b><div class="track" style="--c:${typeColor(r.t)}" title="${r.used} used, ${r.cap - r.used} spare"><em style="width:${(100 * r.used) / maxCap}%"></em><i style="width:${(100 * (r.cap - r.used)) / maxCap}%"></i></div><div class="val num">${r.used} / ${r.cap}<small>${pct(r.used, r.cap)}% used</small></div>`).join("")}</div>
+        <div class="legend-row"><span><i style="background:#2563eb"></i>Used channels</span><span><i style="background:#c7d7fb"></i>Spare channels</span><span>Bar length = channels of the type</span></div>
+      </div></div>
+      <div class="card"><div class="card-head"><h3>${icon("table")}Summary by IO type</h3><span class="spacer"></span><button class="btn sm ghost" data-go="modules">All modules ${icon("arrow")}</button></div><div class="card-body flush">
+        <table class="tbl"><thead><tr><th>Type</th><th class="r">Modules</th><th class="r">Sheets</th><th class="r">Used</th><th class="r">Spare</th><th>Utilisation</th></tr></thead><tbody>
+        ${byType.map((r) => `<tr class="click" data-type="${r.t}"><td><span class="chip" style="--c:${typeColor(r.t)}">${r.t}</span> <span class="muted">${TYPE_NAMES[r.t] || ""}</span></td><td class="r num">${r.ms.length}</td><td class="r num">${r.sheets}</td><td class="r num">${r.used}</td><td class="r num">${r.cap - r.used}</td><td><span class="mini" style="--c:${typeColor(r.t)}"><em style="width:${pct(r.used, r.cap)}%"></em></span><span class="num">${pct(r.used, r.cap)}%</span></td></tr>`).join("")}
+        </tbody><tfoot><tr><td>Total</td><td class="r num">${mods.length}</td><td class="r num">${sheets.length}</td><td class="r num">${used}</td><td class="r num">${cap - used}</td><td class="num">${pct(used, cap)}%</td></tr></tfoot></table>
+      </div></div>
+      <div class="card"><div class="card-head"><h3>${icon("check")}Data checks</h3><span class="note">${nWarn} finding${nWarn === 1 ? "" : "s"}</span><span class="spacer"></span><button class="btn sm ghost" data-go="checks">View all ${icon("arrow")}</button></div><div class="card-body">
+        ${nWarn ? `<div class="issues">${issueHtml}</div>` : `<div class="ok-box">${icon("ok").replace("<svg", '<svg width="18" height="18"')}Every module has its channels, one module name and one IO type.</div>`}
+      </div></div>
+      <div class="card"><div class="card-head"><h3>${icon("pulse")}Recent changes</h3><span class="live show ${watch ? "on" : "wait"}" data-live style="cursor:pointer"><i></i>${watch ? "Watching file" : pending ? "Reconnect live" : "Link Excel"}</span><span class="spacer"></span><button class="btn sm ghost" data-go="live">View all ${icon("arrow")}</button></div><div class="card-body">
+        ${recent.length ? `<div class="changes">${recentHtml}</div>` : `<div class="list-empty">${watch ? "Watching the workbook. Save a change in Excel and it is listed here." : "Link the Excel file (Import Excel in Chrome / Edge) and every save is compared here."}</div>`}
+      </div></div>
+    </div>`;
+
+    wireGo(body);
+    body.querySelectorAll("tr[data-type]").forEach((tr) => (tr.onclick = () => { modType = tr.dataset.type; renderModulesPage(); setView("modules"); }));
+    body.querySelectorAll("[data-issue]").forEach((d) => { const x = issues[+d.dataset.issue]; d.onclick = () => (x.m ? openModule(x.m) : setView("checks")); });
+    body.querySelectorAll("[data-chg]").forEach((d) => (d.onclick = () => openChange(recent[+d.dataset.chg])));
+    body.querySelectorAll("[data-live]").forEach((b) => (b.onclick = () => $("liveBadge").click()));
+  }
+
+  function renderModulesPage() {
+    $("modEmpty").innerHTML = book ? "" : emptyBlock("No modules yet", "Import the IO assignment to list its modules.");
+    wireImport($("modEmpty"));
+    $("modCard").hidden = !book;
+    if (!book) return;
+    const byType = typeRows();
+    if (modType && !byType.some((r) => r.t === modType)) modType = "";
+    const seg = $("modTypeSeg");
+    seg.innerHTML = [`<button data-t="" class="${modType ? "" : "on"}">All <small>${book.modules.length}</small></button>`,
+      ...byType.map((r) => `<button data-t="${r.t}" class="${modType === r.t ? "on" : ""}" style="--c:${typeColor(r.t)}"><i></i>${r.t} <small>${r.ms.length}</small></button>`)].join("");
+    seg.querySelectorAll("button").forEach((b) => (b.onclick = () => { modType = b.dataset.t; renderModulesPage(); }));
+    renderModRows();
+  }
+  function renderModRows() {
+    const tb = $("modRows");
+    if (!book) { tb.innerHTML = ""; return; }
+    const t = modType, q = $("modSearch").value.trim().toUpperCase();
+    const list = [...book.modules].sort((a, b) => a.index - b.index).filter((m) => (!t || m.type === t) && (!q ||
+      [m.module, m.iom, m.link, m.tbname, m.iop, m.iota, m.controller].some((v) => String(v || "").toUpperCase().includes(q)) ||
+      m.sheets.some((s) => s.channels.some((c) => c && ((c.tag || "").toUpperCase().includes(q) || (c.desc || "").toUpperCase().includes(q))))));
+    $("modCount").textContent = `${list.length} of ${book.modules.length} modules` + (list.length > TABLE_MAX_ROWS ? ` · first ${TABLE_MAX_ROWS} shown - search or pick an IO type to narrow` : "");
+    tb.innerHTML = list.slice(0, TABLE_MAX_ROWS).map((m) => `<tr class="click" data-i="${m.index}"><td class="muted num">${m.index}</td><td><span class="chip" style="--c:${typeColor(m.type)}">${esc(m.type || "?")}</span></td><td><b>${esc(m.module)}</b></td><td class="muted">${esc(m.controller)}</td><td>${esc(m.link)}</td><td class="r num">${esc(m.iom)}</td><td class="muted">${esc(m.iop)}</td><td class="muted">${esc(m.iota)}</td><td>${esc(m.tbname)}</td><td class="muted num">${m.startRow}–${m.endRow}</td><td class="r num">${m.sheets.length}</td><td><span class="mini" style="--c:${typeColor(m.type)}"><em style="width:${pct(m.used, m.capacity)}%"></em></span><span class="num">${m.used}/${m.capacity}</span></td><td>${m.warnings.length ? `<span class="warn" title="${esc(m.warnings.join("\n"))}">⚠ ${m.warnings.length}</span>` : '<span class="ok-txt">✓</span>'}</td></tr>`).join("") ||
+      `<tr><td colspan="13" class="list-empty">No module matches.</td></tr>`;
+    tb.querySelectorAll("tr[data-i]").forEach((tr) => (tr.onclick = () => openModule(book.modules.find((m) => m.index === Number(tr.dataset.i)))));
+  }
+  $("modSearch").addEventListener("input", renderModRows);
+
+  function renderChecksPage(issues) {
+    const body = $("checksBody");
+    if (!book) { body.innerHTML = emptyBlock("Nothing to check yet", "Import the IO assignment and its data is checked for missing channels, mixed IO types and duplicate module names."); wireImport(body); return; }
+    const affected = new Set(issues.filter((x) => x.m).map((x) => x.m));
+    const mstat = (k, ico, v, l) => `<div class="mstat" style="--k:${k}"><span class="ico">${icon(ico)}</span><div><b class="num">${v}</b><span>${l}</span></div></div>`;
+    let html = `<div class="strip">${mstat(issues.length ? "#d97706" : "#16a34a", issues.length ? "check" : "ok", issues.length, "Findings")}${mstat("#dc4a12", "module", affected.size, "Modules affected")}${mstat("#16a34a", "ok", book.modules.length - affected.size, "Modules clean")}</div>`;
+    if (!issues.length) html += `<div class="ok-box">${icon("ok").replace("<svg", '<svg width="18" height="18"')}Every module has its channels, one module name and one IO type.</div>`;
+    else html += `<div class="card"><div class="card-head"><h3>${icon("check")}Findings</h3><span class="note">Click a module finding to open its drawing</span></div><div class="table-wrap"><table class="tbl"><thead><tr><th>#</th><th>Type</th><th>Module</th><th>Excel rows</th><th>Finding</th><th></th></tr></thead><tbody>
+      ${issues.slice(0, TABLE_MAX_ROWS).map((x, i) => `<tr class="${x.m ? "click" : ""}" data-issue="${i}"><td class="muted num">${i + 1}</td><td>${x.m ? `<span class="chip" style="--c:${typeColor(x.m.type)}">${esc(x.m.type || "?")}</span>` : '<span class="muted">—</span>'}</td><td><b>${x.m ? esc(x.m.module) : "Workbook"}</b></td><td class="muted num">${x.m ? `${x.m.startRow}–${x.m.endRow}` : "—"}</td><td class="wrap">${esc(x.w)}</td><td class="r">${x.m ? '<span class="btn sm ghost">Open drawing</span>' : ""}</td></tr>`).join("")}
+      </tbody></table>${issues.length > TABLE_MAX_ROWS ? `<div class="list-empty">… and ${issues.length - TABLE_MAX_ROWS} more findings</div>` : ""}</div></div>`;
+    body.innerHTML = html;
+    body.querySelectorAll("tr[data-issue]").forEach((tr) => { const x = issues[+tr.dataset.issue]; if (x.m) tr.onclick = () => openModule(x.m); });
+  }
+
+  function renderLivePage() {
+    const body = $("liveBody");
+    $("liveRight").innerHTML = book ? `<span class="live show ${watch ? "on" : "wait"}" id="liveAction" style="cursor:pointer" title="${watch ? "Watching the Excel file" : "Link the Excel file to follow its saves"}"><i></i>${watch ? `Watching · read ${time(book.readAt || Date.now())}` : pending ? "Reconnect live" : "Link Excel for live"}</span>` : "";
+    if ($("liveAction")) $("liveAction").onclick = () => { if (watch) return; $("liveBadge").click(); };
+    if (!book) { body.innerHTML = emptyBlock("Live update is off", "Import the IO assignment with the Import Excel button (Chrome / Edge). Every save in Excel is then read and compared here."); wireImport(body); return; }
+    if (!feed.length) {
+      body.innerHTML = `<div class="dash-empty">${icon("pulse").replace("<svg", '<svg width="42" height="42" style="color:#16a34a"')}<h3>No changes yet</h3><p>${watch ? "The workbook is being watched. Save a change in Excel and it is listed here, cell by cell." : "Link the Excel file and every save is read again and compared with the drawings."}</p></div>`;
+      return;
+    }
+    body.innerHTML = feed.map((ev, k) => `<div class="card ev-card"><div class="card-head"><h3>${icon("pulse")}${time(ev.at)}</h3><b>${ev.rows.length ? `${ev.rows.length} change${ev.rows.length > 1 ? "s" : ""} ${esc(ev.label || "in Excel")}` : `Saved ${esc(ev.label || "")} — no change on the drawings`}</b><span class="spacer"></span><span class="pill num">Sheets <b>${ev.sheetsBefore} → ${ev.sheetsAfter}</b></span></div>
+      ${ev.rows.length ? `<div class="card-body flush"><table class="tbl"><thead><tr><th>Module</th><th>Field</th><th>Old value</th><th>New value</th></tr></thead><tbody>
+        ${ev.rows.slice(0, 60).map((r, i) => `<tr class="click" data-ev="${k}" data-row="${i}"><td><b>${esc(r.module)}</b></td><td class="muted">${esc(r.what)}</td><td class="wrap"><del>${esc(r.from || "(empty)")}</del></td><td class="wrap"><ins>${esc(r.to || "(empty)")}</ins></td></tr>`).join("")}
+      </tbody></table>${ev.rows.length > 60 ? `<div class="list-empty">… and ${ev.rows.length - 60} more</div>` : ""}</div>` : ""}</div>`).join("");
+    body.querySelectorAll("tr[data-ev]").forEach((tr) => (tr.onclick = () => openChange(feed[+tr.dataset.ev].rows[+tr.dataset.row])));
+  }
+
+  function renderDownloadsPage() {
+    const body = $("dlBody");
+    if (!book) { body.innerHTML = emptyBlock("Nothing to download yet", "Import the IO assignment to generate the loop drawing set as PDF, DWG or DXF."); wireImport(body); return; }
+    const byType = typeRows();
+    body.innerHTML = `<div class="dl-grid">
+        <button class="dl" data-fmt="pdf" style="--c:#dc2626"><span class="fmt-ico">PDF</span><b>Complete drawing set</b><span>${sheets.length > DIRECT_MAX.pdf ? `${sheets.length.toLocaleString()} A1 pages · ${Math.ceil(sheets.length / DIRECT_MAX.pdf)} PDFs (ZIP)` : `One PDF · ${sheets.length} A1 pages`}</span><u>Choose sheets →</u></button>
+        <button class="dl" data-fmt="dwg" style="--c:#1e3a8a"><span class="fmt-ico">DWG</span><b>AutoCAD drawings</b><span>${sheets.length} separate .dwg files (ZIP) · frame bound in</span><u>Choose sheets →</u></button>
+        <button class="dl" data-fmt="dxf" style="--c:#0d9488"><span class="fmt-ico">DXF</span><b>CAD exchange</b><span>${sheets.length} separate .dxf files (ZIP)</span><u>Choose sheets →</u></button>
+      </div>
+      <div class="card"><div class="card-head"><h3>${icon("table")}Drawing set by IO type</h3><span class="note">Download one part of the set</span></div><div class="card-body flush"><table class="tbl"><thead><tr><th>Scope</th><th class="r">Modules</th><th class="r">Sheets</th><th class="r">Download</th></tr></thead><tbody>
+        <tr><td><b>Complete set</b></td><td class="r num">${book.modules.length}</td><td class="r num">${sheets.length}</td><td class="r"><button class="btn sm" data-fmt="pdf" data-scope="all">PDF</button> <button class="btn sm" data-fmt="dwg" data-scope="all">DWG</button></td></tr>
+        ${byType.map((r) => `<tr><td><span class="chip" style="--c:${typeColor(r.t)}">${r.t}</span> <span class="muted">${TYPE_NAMES[r.t] || ""}</span></td><td class="r num">${r.ms.length}</td><td class="r num">${r.sheets}</td><td class="r"><button class="btn sm" data-fmt="pdf" data-scope="${r.t}">PDF</button> <button class="btn sm" data-fmt="dwg" data-scope="${r.t}">DWG</button></td></tr>`).join("")}
+      </tbody></table></div></div>`;
+    body.querySelectorAll("[data-fmt]").forEach((b) => (b.onclick = () => openDownload(b.dataset.fmt, b.dataset.scope)));
+  }
+
+  // ---------- templates: import template DWGs, choose the set ----------
+  const slugOf = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32) || "templates";
+  const post = async (url, body) => {
+    const res = await fetch(url, { method: "POST", body });
+    let data = {};
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+    return data;
+  };
+  async function loadTemplates(setId) {
+    const r = await fetch("/api/templates" + (setId ? "?set=" + encodeURIComponent(setId) : "")).then((x) => x.json());
+    SETS = r.sets; activeSet = r.active; TPL = r.set;
+    if (TPL) setupPaper();
+    return r;
+  }
+  // Another template set: the sheets are made again from the same workbook
+  async function afterSetChange() {
+    shownTemplate = null; edits = {}; changed = new Set();
+    if (waiting && activeSet) {
+      const w = waiting; waiting = null;
+      setView("draw");
+      return importFile(w.file, w.handle);
+    }
+    if (book) {
+      let file = lastFile;
+      if (!file && window.showOpenFilePicker) {
+        try {
+          const h = await idb.get("handle");
+          if (h && (await h.queryPermission({ mode: "read" })) === "granted") file = await h.getFile();
+        } catch (e) {}
+      }
+      if (file) {
+        try { useBook(await analyse(file), false, ""); toast(`${file.name} drawn on the templates of “${(SETS.find((s) => s.id === activeSet) || {}).name}”`, "ok", 4000); }
+        catch (e) { toast("Could not read the Excel file again: " + e.message, true, 8000); }
+      } else {
+        book = null; buildSheets();
+        toast("Template set changed - import the Excel file again", "", 5000);
+      }
+    }
+    renderSource(); renderTabs(); renderFeed(); show(Math.max(cur, 0), true);
+    renderDash();
+  }
+  async function chooseSet(id) {
+    try { await loadTemplates(id); await afterSetChange(); save(); } catch (e) { toast("Could not load the template set: " + e.message, true); }
+  }
+
+  async function importDwgs(files) {
+    files = [...files].filter((f) => /\.dwg$/i.test(f.name));
+    if (!files.length) return toast("Choose .dwg files (the FRAME and the loop templates)", true);
+    setView("templates");
+    if (importing) return toast("A template import is still running", true);
+    const mode = $("tplMode") ? $("tplMode").value : "new";
+    const fresh = mode === "new" || !activeSet;
+    const typed = $("tplName") ? $("tplName").value.trim() : "";
+    const title = fresh ? (typed || files[0].name.replace(/\.dwg$/i, "").replace(/^\d+\./, "") || "New template set") : "";
+    let id = activeSet;
+    if (fresh) { id = slugOf(title); if (SETS.some((s) => s.id === id)) id += "-" + (SETS.length + 1); }
+    importing = true; tplLog = [];
+    renderTemplatesPage();
+    const line = (t, cls) => { tplLog.push(`<div class="${cls || ""}">${esc(t)}</div>`); const l = $("tplLog"); if (l) { l.hidden = false; l.innerHTML = tplLog.join(""); l.scrollTop = l.scrollHeight; } };
+    const q = `set=${encodeURIComponent(id)}` + (title ? `&title=${encodeURIComponent(title)}` : "");
+    try {
+      for (const f of files) { line(`Uploading ${f.name} (${Math.round(f.size / 1024)} KB)`); await post(`/api/templates/upload?${q}&name=${encodeURIComponent(f.name)}`, await f.arrayBuffer()); }
+      await post(`/api/templates/build?${q}`, "");
+      let shown = 0;
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 600));
+        const st = await fetch("/api/templates/log").then((r) => r.json());
+        st.log.slice(shown).forEach((t) => line(t)); shown = st.log.length;
+        if (!st.running) { if (st.error) throw new Error(st.error); break; }
+      }
+      line("Templates are ready.", "ok");
+      await loadTemplates(id);
+      await afterSetChange(); save();
+      toast(`${(SETS.find((s) => s.id === id) || {}).name}: ${Object.keys(TPL.templates).length} templates read`, "ok", 4500);
+    } catch (e) {
+      line("Failed: " + e.message, "err");
+      toast("Template import failed: " + e.message, true, 9000);
+      try { await loadTemplates(activeSet); } catch (x) {}
+    } finally { importing = false; renderTemplatesPage(); }
+  }
+
+  const roleCount = (t) => {
+    const n = {};
+    for (const f of t.terms) n[f.role] = Math.max(n[f.role] || 0, f.side + 1);
+    return Object.entries(n).map(([r, sides]) => `${ROLE_LABELS[r] || r}${sides > 1 ? " ×" + sides : ""}`);
+  };
+  let importing = false, tplLog = [];
+  function renderTemplatesPage() {
+    $("navTpl").textContent = SETS.filter((s) => s.built).length || "";
+    const body = $("tplBody");
+    const built = SETS.filter((s) => s.built), curSet = SETS.find((s) => s.id === activeSet);
+    $("tplRight").innerHTML = built.length ? `<select class="tpl-sel" id="tplSel" title="Template set used for the drawings">${built.map((s) => `<option value="${esc(s.id)}"${s.id === activeSet ? " selected" : ""}>${esc(s.name)}</option>`).join("")}</select>` : "";
+    if ($("tplSel")) $("tplSel").onchange = (e) => chooseSet(e.target.value);
+
+    const importCard = `<div class="card" style="margin-bottom:14px"><div class="card-body">
+      <div class="tpl-drop" id="tplDrop">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        <h3>Import template drawings</h3>
+        <p>Choose the <b>FRAME.dwg</b> and the loop template DWGs (AI, AO, RTD, DI, DO … any number, any layout). Each template is read on its own: IO type, wiring, channels, header texts, field tag / description, system TB · marshalling TB · RTP · JB terminals, sheet number and total.</p>
+        <div class="tpl-form">
+          <select id="tplMode">${curSet ? `<option value="add">Add to “${esc(curSet.name)}” (same files are replaced)</option>` : ""}<option value="new">Create a new template set</option></select>
+          <input id="tplName" type="text" placeholder="Set name, e.g. project number" spellcheck="false" value="">
+        </div>
+        <button class="btn primary" id="tplPick"${importing ? " disabled" : ""}>${importing ? "Reading templates…" : "Choose DWG files"}</button>
+        <span class="note" style="display:block;margin-top:8px">or drop the .dwg files anywhere on this page</span>
+        <div class="tpl-log" id="tplLog"${tplLog.length ? "" : " hidden"}>${tplLog.join("")}</div>
+      </div></div></div>`;
+
+    let cards = "";
+    if (TPL) {
+      const ts = Object.entries(TPL.templates);
+      const need = book ? book.needs || [] : [];
+      const haveT = (label) => { const [t, w] = [label.split(" ")[0], label.split(" ").slice(1).join(" ")]; return ts.filter(([, x]) => x.type === t && (!x.wire || !w || x.wire === w)).map(([, x]) => x.file); };
+      if (need.length) cards += `<div class="card" style="margin-bottom:14px"><div class="card-head"><h3>${icon("check")}Workbook coverage</h3><span class="note">What the imported Excel needs from this template set</span></div><div class="cover">${need.map((n) => {
+        const f = haveT(n.label);
+        return `<div class="${n.have ? "ok" : "miss"}"><b>${esc(n.label)}</b><span>${n.modules} module${n.modules > 1 ? "s" : ""}</span><span>${n.have ? "✓ " + esc([...new Set(f)].join(", ")) : "✗ template missing - import it above"}</span></div>`;
+      }).join("")}</div></div>`;
+      const chips = (a, cls) => a.map((x) => `<span class="tag-chip ${cls || ""}">${esc(x)}</span>`).join("");
+      cards += `<div class="card" style="margin-bottom:14px"><div class="card-head"><h3>${icon("table")}${esc(TPL.name)}</h3><span class="note">Frame ${esc(TPL.frame || "none")} · sheet ${TPL.box ? Math.round(TPL.box[2] - TPL.box[0]) + " × " + Math.round(TPL.box[3] - TPL.box[1]) : ""} units · ${ts.length} templates</span></div>
+        <div class="table-wrap"><table class="tbl"><thead><tr><th>Template</th><th>File</th><th>Type</th><th>Wiring</th><th>Channels</th><th>Header texts found</th><th>Terminals found</th><th>Sheet no. / total</th></tr></thead><tbody>
+        ${ts.map(([id, t]) => `<tr><td><b>${esc(id)}</b></td><td class="muted">${esc(t.file)}</td><td><span class="chip" style="--c:${typeColor(t.type)}">${esc(t.type || "?")}</span></td><td>${esc(t.wire || "—")}</td><td class="num">${t.perChannel ? "1 sheet per channel" : `CH${t.channels[0]}–${t.channels[t.channels.length - 1]}`}</td>
+          <td><div class="tags">${chips(Object.keys(t.header).map((k) => HEADER_LABELS[k] || k), "g")}<span class="tag-chip g">Field tag ×${t.tags.length}</span><span class="tag-chip g">Description ×${t.descs.length}</span></div></td>
+          <td><div class="tags">${t.terms.length ? chips(roleCount(t), "g") + `<span class="tag-chip">${t.terms.length} numbers</span>` : '<span class="tag-chip w">none</span>'}</div></td>
+          <td>${t.sheetno ? '<span class="tag-chip g">sheet ✓</span>' : '<span class="tag-chip r">sheet ✗</span>'} ${t.frameTotal ? '<span class="tag-chip g">total ✓</span>' : '<span class="tag-chip w">total ✗</span>'}</td></tr>`).join("")}
+        </tbody></table></div></div>`;
+      const warns = [...TPL.warnings];
+      if (warns.length) cards += `<div class="card" style="margin-bottom:14px"><div class="card-head"><h3>${icon("check")}Template notes</h3><span class="note">${warns.length}</span></div><div class="card-body"><div class="issues">${warns.map((w) => `<div class="issue">${icon("check")}<div><span>${esc(w)}</span></div></div>`).join("")}</div></div></div>`;
+    } else {
+      cards += `<div class="dash-empty">${icon("sheet").replace("<svg", '<svg width="42" height="42" style="color:#2563eb"')}<h3>No template set yet</h3><p>Import the FRAME and the loop template drawings above. The drawings are made on exactly these templates.</p></div>`;
+    }
+    cards += `<div class="card"><div class="card-head"><h3>${icon("module")}Template sets</h3><span class="note">${SETS.length}</span></div>${SETS.map((s) => `<div class="set-row${s.id === activeSet ? " active" : ""}"><div style="flex:1;min-width:0"><b>${esc(s.name)}</b><small>${s.built ? `${s.templates} templates · ${s.types.join(", ")}` : "not built"} · ${s.files.length} DWG file${s.files.length === 1 ? "" : "s"}: ${esc(s.files.join(", "))}</small></div>
+      ${s.id === activeSet ? '<span class="tag-chip g">in use</span>' : s.built ? `<button class="btn sm" data-use="${esc(s.id)}">Use</button>` : ""}<button class="btn sm ghost" data-del="${esc(s.id)}" title="Delete this set and its files">Delete</button></div>`).join("") || '<div class="list-empty">No sets.</div>'}</div>`;
+    body.innerHTML = importCard + cards;
+    $("tplPick").onclick = () => $("dwgFiles").click();
+    body.querySelectorAll("[data-use]").forEach((b) => (b.onclick = () => chooseSet(b.dataset.use)));
+    body.querySelectorAll("[data-del]").forEach((b) => (b.onclick = async () => {
+      const s = SETS.find((x) => x.id === b.dataset.del);
+      if (!confirm(`Delete the template set “${s.name}” and its DWG files?`)) return;
+      try { await post(`/api/templates/delete?set=${encodeURIComponent(s.id)}`, ""); await loadTemplates(s.id === activeSet ? "" : activeSet); if (s.id === activeSet) await afterSetChange(); renderDash(); }
+      catch (e) { toast(e.message, true); }
+    }));
+  }
+  $("dwgFiles").onchange = (e) => { importDwgs(e.target.files); e.target.value = ""; };
+
+  // ---------- keyboard / misc ----------
+  $("prevBtn").onclick = () => show(cur - 1);
+  $("nextBtn").onclick = () => show(cur + 1);
+  document.addEventListener("keydown", (e) => {
+    if (e.target.closest("input, select, textarea, dialog") || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (ui.view !== "draw") return;
+    const k = e.key;
+    if (k === "PageDown" || k === "ArrowRight") { e.preventDefault(); if (cur < sheets.length - 1) show(cur + 1); }
+    else if (k === "PageUp" || k === "ArrowLeft") { e.preventDefault(); if (cur > 0) show(cur - 1); }
+    else if (k === "Escape") { closeEditor(); if (focusCh != null) focusChannel(focusCh); }
+    else if (k === "f" || k === "F") fitView();
+    else if (k === "w" || k === "W") fitWidth();
+    else if (k === "+" || k === "=") centerZoom(1 / 1.4);
+    else if (k === "-") centerZoom(1.4);
+    else if (k === "/") { e.preventDefault(); if (!ui.side) { ui.side = true; applyUI(); } $("search").focus(); }
+    else if (k === "[") $("sideBtn").click();
+    else if (k === "]") $("inspBtn").click();
+    else if (k === "ArrowDown" || k === "ArrowUp") {
+      const t = cur >= 0 && tplOf(cur); if (!t) return;
+      e.preventDefault();
+      const chs = sheets[cur].s.per ? [sheets[cur].s.first] : t.channels;
+      const i = focusCh == null ? (k === "ArrowDown" ? 0 : chs.length - 1) : chs.indexOf(focusCh) + (k === "ArrowDown" ? 1 : -1);
+      if (i >= 0 && i < chs.length) { focusCh = null; focusChannel(chs[i]); }
+    }
+  });
+  $("search").addEventListener("input", () => { query = $("search").value.trim(); renderList(); });
+  stage.addEventListener("click", closeEditor);
+
+  // ---------- init ----------
+  async function init() {
+    const saved = load();
+    try { await loadTemplates(saved && saved.set); }
+    catch (e) { $("offline").style.display = "block"; return; }
+    if (saved && saved.ui) ui = { ...ui, ...saved.ui };
+    applyUI();
+    setView(ui.view, false);
+    // The saved workbook belongs to the saved template set: use it only when that set is still the one in use
+    if (saved && saved.book && Array.isArray(saved.book.modules) && saved.set === activeSet && activeSet) {
+      book = saved.book; edits = saved.edits || {}; filter = saved.filter || "ALL"; feed = saved.feed || [];
+      buildSheets();
+    }
+    renderSource(); renderTabs(); renderFeed();
+    const i = saved ? sheets.findIndex((x) => x.key === saved.key) : -1;
+    show(i >= 0 ? i : 0, true);
+
+    // Reconnect to the Excel file of the last session and read it again, so what is shown is the file now
+    const handle = window.showOpenFilePicker ? await idb.get("handle") : null;
+    if (handle && book && handle.name === book.file) {
+      let p = "prompt";
+      try { p = await handle.queryPermission({ mode: "read" }); } catch (e) {}
+      if (p === "granted") reconnect(handle);
+      else { pending = handle; setLive("wait", "Reconnect live", `Click to read ${handle.name} again and follow its saves (the browser asks once)`); }
+    } else if (book) setLive("wait", "Link Excel for live", "Pick the Excel file again to follow its saves");
+  }
+  init();
+})();
+</script>
+</body>
+</html>

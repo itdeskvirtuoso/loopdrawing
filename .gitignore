@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+
+# Runtime files of the server (exports are made on demand)
+data/exports/
+data/server.log
+
+# Local backups / editor / tool folders
+backup_before_sets/
+index.backup.html
+.claude/
+
+# Vercel + secrets
+.vercel/
+.env
+.env.*
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Customer project files (workbooks, template drawings) - not code, kept out of the public repo
+source/
+data/sets/
