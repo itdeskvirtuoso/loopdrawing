@@ -1,0 +1,18 @@
+{
+  "name": "loopdrawing",
+  "private": true,
+  "version": "2.0.0",
+  "description": "Loop drawing generator - runs completely in the browser (no server)",
+  "type": "module",
+  "scripts": {
+    "vendor": "node scripts/vendor.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:golden": "node --test tests/golden/"
+  },
+  "devDependencies": {
+    "cfb": "^1.2.2",
+    "jszip": "^3.10.1",
+    "opentype.js": "^1.3.4",
+    "pdf-lib": "^1.17.1"
+  }
+}

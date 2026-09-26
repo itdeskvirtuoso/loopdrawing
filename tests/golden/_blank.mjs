@@ -1,0 +1,32 @@
+// Renders the golden template DXF (ezdxf-written) with the JS renderer into a one page PDF for comparison with the golden PDF.
+import fs from "node:fs";
+import opentype from "opentype.js";
+import { PDFDocument, PDFName } from "pdf-lib";
+import { parseDxf } from "../../web/js/core/dxf.js";
+import { TextEngine } from "../../web/js/core/text.js";
+import { buildDisplay } from "../../web/js/core/render.js";
+import { pdfContent, pageSize, svgSheet } from "../../web/js/core/output.js";
+
+const W = "C:/Users/Hitesh ingale/Desktop/wasm-build/";
+const tid = process.argv[2] || "DO";
+const set = JSON.parse(fs.readFileSync(W + "golden/set/set.json", "utf8"));
+const t = set.templates[tid];
+const b = fs.readFileSync("web/fonts/LiberationSans-Regular.ttf");
+const font = opentype.parse(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
+const doc = parseDxf(fs.readFileSync(W + `golden/set/${tid}.dxf`, "utf8"));
+const fields = [...Object.values(t.header), ...(t.jblines || []), ...(t.jbtags || []), ...t.tags, ...t.descs, ...t.terms];
+const blank = new Set(fields.map((f) => f.h));
+if (t.sheetno) blank.add(t.sheetno.h);
+if (t.frameTotal) blank.add(t.frameTotal.h);
+const t0 = Date.now();
+const disp = buildDisplay(doc, { engine: new TextEngine(font), blank });
+console.log("display", disp.strokes.length, "strokes", disp.fills.length, "fills", "errors", disp.errors || 0, Date.now() - t0, "ms");
+const box = set.box;
+const [w, h] = pageSize(box);
+const pdf = await PDFDocument.create();
+const page = pdf.addPage([w, h]);
+const stream = pdf.context.stream(pdfContent(disp, box));
+page.node.set(PDFName.of("Contents"), pdf.context.register(stream));
+fs.writeFileSync(W + `out/blank_${tid}.js.pdf`, await pdf.save());
+fs.writeFileSync(W + `out/blank_${tid}.js.svg`, svgSheet(disp, box));
+console.log("written", W + `out/blank_${tid}.js.pdf`);

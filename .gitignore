@@ -1,12 +1,14 @@
-# Python
-__pycache__/
-*.pyc
+# Dependencies (only needed to refresh web/vendor: npm run vendor)
+node_modules/
 
-# Runtime files of the server (exports are made on demand)
-data/exports/
-data/server.log
+# Local test files and output of the browser tests
+web/_testdata/
 
-# Local backups / editor / tool folders
+# Customer project files (workbooks, template drawings) - not code, never in the public repo
+source/
+data/
+
+# Old backups / editor / tool folders
 backup_before_sets/
 index.backup.html
 .claude/
@@ -19,7 +21,3 @@ index.backup.html
 # Windows
 Thumbs.db
 desktop.ini
-
-# Customer project files (workbooks, template drawings) - not code, kept out of the public repo
-source/
-data/sets/
