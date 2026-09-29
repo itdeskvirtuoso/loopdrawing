@@ -13,13 +13,13 @@ import { embedFrame } from "./xref.js";
 import { r2 } from "./edit.js";
 import {
   analyze, assignIds, correctLabels, deriveVariant, DERIVED, dropSortTables, frameExtent, simpleMTextToText, superscriptsToCharacters,
-  TemplateError, wingdingsToTick,
+  TemplateError, wingdingsToTick, CH_LABEL, TAG_LABELS,
 } from "./analyze.js";
 
-export const VERSION = 15; // raise when the analysis changes: sets built with an older version are rebuilt
+export const VERSION = 16; // raise when the analysis changes: sets built with an older version are rebuilt
 
 const stem = (n) => n.replace(/\.[^.]*$/, "");
-const allFields = (t) => [...Object.values(t.header), ...(t.jblines || []), ...(t.jbtags || []), ...t.tags, ...t.descs, ...t.terms];
+const allFields = (t) => [...Object.values(t.header), ...(t.jblines || []), ...(t.jbtags || []), ...(t.chlabels || []), ...t.tags, ...t.descs, ...t.terms];
 export { allFields };
 
 function bytesToBase64(b) {
@@ -50,7 +50,7 @@ export async function buildSet(setId, name, files, env) {
   for (const [n, text] of dxfOf) {
     const doc = parseDxf(text);
     const words = doc.msp.filter((e) => e.type === "TEXT").map((e) => e.get(1, "").trim());
-    const isTpl = words.some((w) => /^CH\d+$/.test(w)) && words.some((w) => /^FIELD\s*TAG\s*:/i.test(w));
+    const isTpl = words.some((w) => new RegExp(`^(?:${CH_LABEL})$`, "i").test(w)) && words.some((w) => TAG_LABELS.some((p) => new RegExp(p, "i").test(w)));
     if (isTpl) templ.push(n); else frames.set(n, doc);
   }
   if (!templ.length) throw new TemplateError("none of the DWG files is a loop template (a template has 'CH1', 'CH2' ... and 'FIELD TAG:' texts). A frame alone cannot be used: add it to a set that has the templates (\"Add to ...\")");

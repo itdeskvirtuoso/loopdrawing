@@ -605,7 +605,7 @@
     <section class="source">
       <p class="eyebrow">IO assignment</p>
       <div id="fileName" class="file-name">No workbook imported</div>
-      <div id="fileMeta" class="file-meta">Supported: .xlsx / .xlsm with MODULE NAME and CHANNEL columns</div>
+      <div id="fileMeta" class="file-meta">Supported: .xlsx / .xlsm with a CHANNEL column, a TAG / DESCRIPTION column and MODULE NAME (or IOM / rack / slot)</div>
       <div id="stats" class="stats" hidden></div>
       <div id="readLine" class="readline" hidden><i></i><span></span></div>
       <div id="bookWarn" class="notice"></div>
@@ -796,6 +796,7 @@
   const tplOf = (i) => TPL.templates[sheets[i].s.template];
   // A sheet of a one-channel template is one channel of a module: its id is template@channel, its channel is s.first
   const sid = (s) => s.uid || s.template;
+  const slotCh = (s, t) => (s.per ? [s.first] : s.chs || t.channels); // the channel numbers of a sheet (a repeated template page has its own)
   const chText = (s) => (s.first === s.last ? `CH${s.first}` : `CH${s.first}–${s.last}`);
   const chPre = (t, ch) => (t.perChannel ? "" : `CH${ch} · `);
 
@@ -809,7 +810,7 @@
   // ---------- Excel -> sheet texts ----------
   // The reader maps every workbook value to the text of the template it belongs to (io_excel.sheet_texts)
   const excelTexts = (m, sh) => sh.texts;
-  const allFields = (t) => [...Object.values(t.header), ...(t.jblines || []), ...(t.jbtags || []), ...t.tags, ...t.descs, ...t.terms];
+  const allFields = (t) => [...Object.values(t.header), ...(t.jblines || []), ...(t.jbtags || []), ...(t.chlabels || []), ...t.tags, ...t.descs, ...t.terms];
   const labelCache = new WeakMap();
   function fieldLabels(t) {
     if (!labelCache.has(t)) {
@@ -817,6 +818,7 @@
       for (const [key, f] of Object.entries(t.header)) label[f.h] = { name: HEADER_LABELS[key] || key };
       (t.jblines || []).forEach((f) => (label[f.h] = { name: `JB no. (line ${f.slot + 1})` }));
       (t.jbtags || []).forEach((f) => (label[f.h] = { name: "JB name", ch: f.ch }));
+      (t.chlabels || []).forEach((f) => (label[f.h] = { name: "Channel no.", ch: f.ch }));
       t.tags.forEach((f, i) => (label[f.h] = { name: "Field tag", ch: t.channels[i] }));
       t.descs.forEach((f, i) => (label[f.h] = { name: "Description", ch: t.channels[i] }));
       for (const f of t.terms) label[f.h] = { name: `${ROLE_LABELS[f.role] || f.role} terminal ${f.k + 1}${f.side ? " (side " + (f.side + 1) + ")" : ""}`, ch: f.ch };
@@ -859,7 +861,7 @@
       for (const h of Object.keys(tb)) {
         if (ta[h] === tb[h] || !label[h]) continue;
         const f = fieldInfoOf(t, h), p = (f && f.prefix) || "";
-        rows.push({ module: m.module, template: s.template, uid: sid(s), handle: h, ch: s.per ? s.first : label[h].ch, what: (label[h].ch ? `CH${s.per ? s.first : label[h].ch} · ` : "") + label[h].name,
+        rows.push({ module: m.module, template: s.template, uid: sid(s), handle: h, ch: s.per ? s.first : label[h].ch && label[h].ch + (s.offset || 0), what: (label[h].ch ? `CH${s.per ? s.first : label[h].ch + (s.offset || 0)} · ` : "") + label[h].name,
                     from: (ta[h] || "").slice(p.length), to: tb[h].slice(p.length) });
       }
     }
@@ -875,7 +877,7 @@
     $("fileName").title = has ? book.file || "" : "";
     $("fileMeta").textContent = has
       ? `Sheet “${book.sheet}” · header row ${book.headerRow} · ` + (book.mode === "yellow" ? `split at ${book.yellowRows.length} yellow rows` : "split by MODULE NAME")
-      : "Supported: .xlsx / .xlsm with MODULE NAME and CHANNEL columns";
+      : "Supported: .xlsx / .xlsm with a CHANNEL column, a TAG / DESCRIPTION column and MODULE NAME (or IOM / rack / slot)";
     const st = $("stats"); st.innerHTML = ""; st.hidden = !has;
     if (has) {
       const used = book.modules.reduce((a, m) => a + m.used, 0), cap = book.modules.reduce((a, m) => a + m.capacity, 0);
@@ -1010,7 +1012,7 @@
     pane.append(u);
 
     t.channels.forEach((ch0, i) => {
-      const ch = x.s.per ? x.s.first : ch0;
+      const ch = x.s.per ? x.s.first : ch0 + (x.s.offset || 0);
       const c = x.s.channels[i];
       const spare = !c || /SPARE/i.test(c.tag || "") || (!c.tag && !c.desc);
       const row = el("div", "ch" + (spare ? " spare" : "") + (focusCh === ch ? " active" : ""));
@@ -1132,6 +1134,7 @@
       for (const [k, f] of Object.entries(t.header)) g.append(makeText(f, labels[k] || k));
       (t.jblines || []).forEach((f) => g.append(makeText(f, `JB number(s) · line ${f.slot + 1}`)));
       (t.jbtags || []).forEach((f) => g.append(makeText(f, `${chPre(t, f.ch)}JB name`)));
+      (t.chlabels || []).forEach((f) => g.append(makeText(f, "Channel no.")));
       t.tags.forEach((f, i) => g.append(makeText(f, `${chPre(t, t.channels[i])}Field tag`)));
       t.descs.forEach((f, i) => g.append(makeText(f, `${chPre(t, t.channels[i])}Description`)));
       for (const f of t.terms) g.append(makeText(f, `${chPre(t, f.ch)}${fieldLabels(t)[f.h].name}`));
@@ -1206,7 +1209,7 @@
     $("hl").innerHTML = "";
     Object.values(els).forEach((e) => e.classList.remove("focus"));
     if (!t) return;
-    const i = x.s.per ? (ch === x.s.first ? 0 : -1) : t.channels.indexOf(ch);
+    const i = slotCh(x.s, t).indexOf(ch);
     if (i < 0) return;
     const a = els[t.tags[i].h], b = els[t.descs[i].h];
     a.classList.add("focus"); b.classList.add("focus");
@@ -2085,7 +2088,7 @@
     else if (k === "ArrowDown" || k === "ArrowUp") {
       const t = cur >= 0 && tplOf(cur); if (!t) return;
       e.preventDefault();
-      const chs = sheets[cur].s.per ? [sheets[cur].s.first] : t.channels;
+      const chs = slotCh(sheets[cur].s, t);
       const i = focusCh == null ? (k === "ArrowDown" ? 0 : chs.length - 1) : chs.indexOf(focusCh) + (k === "ArrowDown" ? 1 : -1);
       if (i >= 0 && i < chs.length) { focusCh = null; focusChannel(chs[i]); }
     }

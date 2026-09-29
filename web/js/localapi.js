@@ -121,7 +121,7 @@ function checkItems(built, items) {
   for (const it of items) {
     if (!t[it.template]) throw new Error(`unknown template ${JSON.stringify(it.template)}`);
     const tt = t[it.template];
-    const have = new Set([...Object.values(tt.header), ...(tt.jblines || []), ...(tt.jbtags || []), ...tt.tags, ...tt.descs, ...tt.terms].map((f) => f.h));
+    const have = new Set([...Object.values(tt.header), ...(tt.jblines || []), ...(tt.jbtags || []), ...(tt.chlabels || []), ...tt.tags, ...tt.descs, ...tt.terms].map((f) => f.h));
     const texts = it.texts || {};
     const bad = Object.keys(texts).find((h) => !have.has(h));
     if (bad) throw new Error(`template ${it.template}: unknown text ${bad}`);

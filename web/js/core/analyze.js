@@ -25,7 +25,14 @@ export const HEADER = [ // key, pattern of the text (the topmost match is the sh
 const COLUMN_LABELS = [["sysgroup", "sys"], ["tbname", "tb"], ["rtpname", "rtp"], ["jbname", "jb"]];
 const IO_TYPE = /^[A-Z]{2,4}$/;
 const TITLE_TYPES = [["ANALOG\\s+INPUT", "AI"], ["ANALOG\\s+OUTPUT", "AO"], ["\\bRTD\\b", "RTD"], ["DIGITAL\\s+INPUT", "DI"], ["DIGITAL\\s+OUTPUT", "DO"]];
-const NOT_A_VALUE = "(\\d+|CH\\d+|CHNL\\s*NO\\.?|CHANNEL.*)";
+// A channel label: 'CH1', 'CH 01', 'CH-1', 'CHNL 1', 'CHANNEL NO. 1' (the number at the end is the channel)
+export const CH_LABEL = "CH(?:ANNEL|NL)?\\s*(?:NO\\.?)?\\s*[-.:#]?\\s*\\d+";
+export const chNumber = (s) => parseInt(/(\d+)\s*$/.exec(s)[1], 10);
+// The texts above the tag / description of a channel: 'FIELD TAG:' / 'DESCRIPTION:', or - when those are not there once per
+// channel - 'TAG NO:', 'INSTRUMENT TAG:', 'SERVICE:', 'SERVICE DESCRIPTION:' ...
+export const TAG_LABELS = ["^FIELD\\s*TAG\\s*:", "^(FIELD\\s*|INSTRUMENT\\s*|LOOP\\s*)?TAG\\s*(NO\\.?|NAME|NUMBER)?\\s*:"];
+const DESC_LABELS = ["^DESCRIPTION\\s*:", "^(SERVICE\\s*|TAG\\s*|LOOP\\s*)?(DESCRIPTION|DESC\\.?)\\s*:|^SERVICE\\s*:"];
+const NOT_A_VALUE = "(\\d+|" + CH_LABEL + "|CHNL\\s*NO\\.?|CHANNEL.*)";
 export const TYPE_WORDS = { AI: "ANALOG INPUT", AO: "ANALOG OUTPUT", DI: "DIGITAL INPUT", DO: "DIGITAL OUTPUT" };
 
 // ------------------------------------------------------------------------------------------------ helpers
@@ -348,14 +355,22 @@ export function analyze(doc, tid, frameName, box, forceType = null) {
   // the frame of the set (an xref bound into the template), or - a drawing that has its own frame - every inserted block
   const frameTexts = (frameName ? walkTexts(doc, frameName) : walkAllTexts(doc)).map(({ e, m }) => frameTextInfo(e, m));
 
-  const chs = [...find(texts, "^CH\\d+$")].sort((a, b) => b.y - a.y);
-  let tags = [...find(texts, "^FIELD\\s*TAG\\s*:")].sort((a, b) => b.y - a.y);
-  let descs = [...find(texts, "^DESCRIPTION\\s*:")].sort((a, b) => b.y - a.y);
+  const chs = texts.filter((t) => reFull(CH_LABEL, strip(t.t))).sort((a, b) => b.y - a.y);
   if (!chs.length) throw new TemplateError("no 'CH1, CH2 ...' channel labels found");
+  const perCh = (pats) => pats.map((p) => find(texts, p)).find((m) => m.length === chs.length) || find(texts, pats[0]); // the first label there once per channel
+  let tags = [...perCh(TAG_LABELS)].sort((a, b) => b.y - a.y);
+  let descs = perCh(DESC_LABELS).filter((t) => !tags.includes(t)).sort((a, b) => b.y - a.y);
   if (!(tags.length === descs.length && descs.length === chs.length))
     throw new TemplateError(`${chs.length} channel labels but ${tags.length} 'FIELD TAG:' and ${descs.length} 'DESCRIPTION:' texts`);
-  const channels = chs.map((c) => parseInt(strip(c.t).slice(2), 10));
+  const channels = chs.map((c) => chNumber(strip(c.t)));
+  if (new Set(channels).size !== channels.length) throw new TemplateError(`channel labels are repeated: ${chs.map((c) => strip(c.t)).join(", ")}`);
   const perChannel = channels.length === 1; // a sheet of one channel: the workbook gives one such sheet per channel
+  // The channel labels are written on every sheet, so a template of CH1-8 also draws CH9-16 of a 16 channel module ('CH01' stays 2 digits)
+  const chFormat = (c) => {
+    const raw = strip(c.t), d = /(\d+)$/.exec(raw)[1];
+    return { prefix: raw.slice(0, raw.length - d.length), pad: d.length > 1 && d[0] === "0" ? d.length : 0 };
+  };
+  const chlabels = perChannel ? [] : chs.map((c, i) => ({ ...c, ...chFormat(c), ch: channels[i] }));
 
   const x1 = box[2];
   const rightLimit = x1 - 115; // inner border of the frame (x1 - 85) and a margin, so long texts never touch it
@@ -487,11 +502,11 @@ export function analyze(doc, tid, frameName, box, forceType = null) {
     const c = { ...chs[0] };
     const cellc = cellOf(c, vert);
     const cx = labelCentre(c);
-    c.prefix = "CH";
+    Object.assign(c, chFormat(c));
     c.w = cellc && cellc[0] < cx && cx < cellc[1] ? r2(2 * (Math.min(cx - cellc[0], cellc[1] - cx) - 4)) : 80;
     header.chlabel = c;
   }
-  return { type: ioType, wire, title, channels, perChannel, header, tags, descs, terms, jblines, jbtags, sheetno, frameTotal: total, warnings: warn };
+  return { type: ioType, wire, title, channels, perChannel, header, tags, descs, terms, jblines, jbtags, chlabels, sheetno, frameTotal: total, warnings: warn };
 }
 
 // ------------------------------------------------------------------------------------------------ ids of the templates
@@ -530,7 +545,7 @@ export function assignIds(found) {
 }
 
 // ------------------------------------------------------------------------------------------------ preparing the drawing
-const FIELDLIKE = "(\\d+|TB\\s?\\d+|JB.{0,12}|[A-Z]*(TB|RTP)X{2,}|CH\\d+)";
+const FIELDLIKE = "(\\d+|TB\\s?\\d+|JB.{0,12}|[A-Z]*(TB|RTP)X{2,}|" + CH_LABEL + ")";
 const ATTACH = { 1: [0, 3], 2: [1, 3], 3: [2, 3], 4: [0, 2], 5: [1, 2], 6: [2, 2], 7: [0, 1], 8: [1, 1], 9: [2, 1] };
 
 /** Short single line MTEXTs that hold values ('TB1', a terminal number) become TEXT, so that they can be filled like any other text. */

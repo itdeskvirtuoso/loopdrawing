@@ -134,7 +134,7 @@ export class SheetWriter {
     this.engine = engine;
     if (forDwg) prepareForDwg(this.doc, engine);
     this.fields = new Map();
-    for (const f of [...Object.values(tpl.header), ...(tpl.jblines || []), ...(tpl.jbtags || []), ...tpl.tags, ...tpl.descs, ...tpl.terms]) this.fields.set(f.h, f);
+    for (const f of [...Object.values(tpl.header), ...(tpl.jblines || []), ...(tpl.jbtags || []), ...(tpl.chlabels || []), ...tpl.tags, ...tpl.descs, ...tpl.terms]) this.fields.set(f.h, f);
     if (tpl.sheetno) this.fields.set(tpl.sheetno.h, tpl.sheetno);
     if (tpl.frameTotal) this.fields.set(tpl.frameTotal.h, tpl.frameTotal);
     this.ents = new Map();

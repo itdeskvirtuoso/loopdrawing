@@ -2,19 +2,25 @@
 //
 // The workbook is read by what its columns are called, not by where they are, so the layouts of different projects work alike
 // (see ALIASES / GROUPS). Rows are grouped into modules: a new module starts at every yellow highlighted row, or - when the sheet
-// has no yellow rows - at every new MODULE NAME.
+// has no yellow rows - at every new MODULE NAME (a workbook without that column: every new controller / link / rack / slot / IOM).
 import { openWorkbook } from "./xlsx.js";
 
 export const TYPES = ["AI", "AO", "RTD", "DI", "DO"]; // order of the drawing set; other types follow
 
 // key -> header names (first match wins; "#2" = the second column with that name)
 const ALIASES = {
-  sr: ["SR NO"], c300: ["C300 CONTROL MODULE NAME", "C300 TAG", "DCS TAG NAME"], tag: ["CHANNEL NAME", "FIELD TAG"], desc: ["DESCRIPTION"],
-  dcs_desc: ["DCS DESCRIPTION"], equipment: ["EQUIPMENT TYPE"], area: ["AREA", "SECTION"], signal: ["SIGNAL", "SIGNAL POTENTIAL"], wire: ["SIGNAL TYPE"],
-  controller: ["CONTROLLER NAME"], link: ["LINK NO", "LINK"], iom: ["IOM NO", "IOM NUM", "IOM NUMBER", "MODULE NO"], channel: ["CHANNEL"],
-  module: ["MODULE NAME"], iop: ["MODULE PART NO", "IOM MODEL NO", "IOP"], iota: ["IOTA PART NO", "IOTA MODEL NO", "IOTA"],
+  sr: ["SR NO", "S NO", "SL NO"], c300: ["C300 CONTROL MODULE NAME", "C300 TAG", "DCS TAG NAME", "DCS TAG", "CONTROL MODULE NAME"],
+  tag: ["CHANNEL NAME", "FIELD TAG", "FIELD TAG NO", "TAG NO", "TAG NUMBER", "TAG NAME", "INSTRUMENT TAG", "INSTRUMENT TAG NO", "LOOP TAG", "TAG"],
+  desc: ["DESCRIPTION", "SERVICE DESCRIPTION", "TAG DESCRIPTION", "LOOP DESCRIPTION", "INSTRUMENT DESCRIPTION", "SERVICE"],
+  dcs_desc: ["DCS DESCRIPTION"], equipment: ["EQUIPMENT TYPE"], area: ["AREA", "SECTION"], signal: ["SIGNAL", "SIGNAL POTENTIAL"], wire: ["SIGNAL TYPE", "WIRING", "WIRE TYPE"],
+  controller: ["CONTROLLER NAME", "CONTROLLER"], link: ["LINK NO", "LINK"], iom: ["IOM NO", "IOM NUM", "IOM NUMBER", "MODULE NO", "CARD NO", "CARD"],
+  rack: ["RACK NO", "RACK"], slot: ["SLOT NO", "SLOT"],
+  channel: ["CHANNEL", "CHANNEL NO", "CH NO", "CHNL NO", "CHANNEL NUMBER", "CH", "CHNL", "IO CHANNEL", "IOM CHANNEL", "CARD CHANNEL"],
+  module: ["MODULE NAME", "IOM NAME", "CARD NAME", "IO MODULE NAME", "MODULE TAG", "MODULE"], iop: ["MODULE PART NO", "IOM MODEL NO", "IOP", "MODULE MODEL NO", "CARD PART NO"],
+  iota: ["IOTA PART NO", "IOTA MODEL NO", "IOTA"],
   sysgroup: ["SYSTEM TB GROUP", "IOTA TB GRP 1", "IOTA TB GROUP"], sys1: ["TB1", "TB 1"], sys2: ["TB2", "TB 2"], sys3: ["TB3", "TB 3"],
 };
+const MODULE_ID = ["controller", "link", "rack", "slot", "iom"]; // what tells the modules apart when there is no MODULE NAME column
 // A name column followed by its terminal columns: TB NAME | TERMINAL NO | TERMINAL NO
 const GROUPS = { tb: ["TB NAME"], rtp: ["RTP NAME", "RTP NO", "RTB NAME", "RTB NO"], jb: ["JB NAME", "JB NO"] }; // RTP / RTB = the relay terminal panel / base of a DO loop
 const TERMINAL = /^(TERMINAL(NO)?\d*|TBNO\d*|RTPRTB\d*|RTB\d*|JBTERMINAL(NO)?\d*|DOTERMINAL(NO)?\d*)$/;
@@ -28,7 +34,32 @@ export function clean(v) {
   return String(v).split(/\s+/).filter(Boolean).join(" ");
 }
 export const real = (v) => !NOT_A_VALUE.has(clean(v).toUpperCase());
-const normName = (v) => clean(v).toUpperCase().replace(/[\s._-]+/g, "");
+const normName = (v) => clean(v).toUpperCase().replace(/[\s._\-/()]+/g, "");
+
+/** The channel number of a cell: 5, '05', '5.0', 'CH5', 'CH-05', 'CHNL 5', 'R1-S2-CH5'. null when there is none. */
+export function parseChannel(v) {
+  const s = clean(v).toUpperCase();
+  let m = /^(\d+)(\.0+)?$/.exec(s) || /^CH(?:ANNEL|NL)?\s*(?:NO\.?)?\s*[-.:#]?\s*(\d+)$/.exec(s) || /(?:^|[^A-Z])CH(?:ANNEL|NL)?\s*[-.:#]?\s*(\d+)$/.exec(s);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+/** The IO type of a text: 'AI', 'A.I.', 'AI HART', 'ANALOG INPUT', 'DI-24VDC', 'RTD/TC' ... -> one of the template set's types
+ *  (or AI / AO / DI / DO / RTD). '' when the text names no type. */
+export function canonType(v, known = new Set()) {
+  const s = clean(v).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (!s) return "";
+  if (known.has(s)) return s;
+  const rules = [[/RTD|THERMOCOUPLE|PT100|^TC|^LLAI|^LLMUX/, "RTD"], [/^ANALOGU?E?INPUT/, "AI"], [/^ANALOGU?E?OUTPUT/, "AO"], [/^(DIGITAL|BINARY)INPUT/, "DI"],
+    [/^(DIGITAL|BINARY)OUTPUT/, "DO"], [/^AI/, "AI"], [/^AO/, "AO"], [/^(DI|BI$)/, "DI"], [/^(DO|BO$)/, "DO"]];
+  for (const [re, t] of rules) if (re.test(s)) return t === "RTD" && !known.has("RTD") && known.has("TC") ? "TC" : t;
+  return "";
+}
+/** The IO type of a module part number: Honeywell 'CC-PAIH01', '8C-PAINA1' (AI), 'CC-PAIM01' (low level = RTD), '8C-PDODA1' (DO) ... */
+function partType(v) {
+  const m = /(?:^|[^A-Z])P(AI|AO|DI|DO)([A-Z])?/.exec(clean(v).toUpperCase());
+  if (!m) return "";
+  return m[1] === "AI" && m[2] === "M" ? "RTD" : m[1];
+}
 const mostCommon = (values) => {
   const vs = values.filter(Boolean);
   if (!vs.length) return "";
@@ -39,11 +70,13 @@ const mostCommon = (values) => {
   return best;
 };
 
-/** rows: the first rows of the sheet as arrays of values. Returns [row number, column map] or [null, null]. */
+/** rows: the first rows of the sheet as arrays of values. Returns [row number, column map, score] or [null, null, 0]: the row that
+ *  names the most known columns among those with a channel column, a tag or description column and something that tells the
+ *  modules apart (MODULE NAME, IOM / card, rack / slot). */
 function findHeader(rows) {
+  let best = [null, null, 0];
   for (const [r, row] of rows) {
     const names = row.map((v) => normName(v));
-    if (!names.includes("MODULENAME") || !names.includes("CHANNEL")) continue;
     const col = {}, groups = {};
     for (const [key, options] of Object.entries(ALIASES)) {
       for (const opt of options) {
@@ -69,18 +102,23 @@ function findHeader(rows) {
     const types = []; names.forEach((n, i) => { if (n === "TYPE" || n === "IOTYPE") types.push(i); });
     const after = types.filter((i) => i > (col.link ?? -1));
     if (after.length || types.length) col.iotype = (after.length ? after : types)[0];
+    if (!("channel" in col) || !["tag", "desc", "c300"].some((k) => k in col) || !["module", "iom", "rack", "slot"].some((k) => k in col)) continue;
+    const score = Object.keys(col).length + Object.keys(groups).length;
     col._groups = groups;
-    return [r, col];
+    if (score > best[2]) best = [r, col, score];
   }
-  return [null, null];
+  return best;
 }
 
-function normType(rec) {
-  const t = rec.iotype.toUpperCase().replace(/ /g, "");
-  if (t && t !== "TYPE") return t;
+/** IO type of a row: its IO TYPE column, else the module part number, the SIGNAL TYPE column or the module name ('C1L1AI01'). */
+function normType(rec, known) {
+  const raw = rec.iotype.toUpperCase().replace(/ /g, "");
+  if (raw && raw !== "TYPE") return canonType(raw, known) || raw;
+  const t = partType(rec.iop) || canonType(rec.wire, known) || canonType(rec.signal, known);
+  if (t) return t;
   const m = rec.module.toUpperCase();
-  for (const name of ["RTD", "AI", "AO", "DI", "DO"]) if (m.includes(name)) return name; // RTD before the 2-letter names
-  return t;
+  for (const name of ["RTD", "AI", "AO", "DI", "DO"]) if (new RegExp(`(^|[^A-Z])${name}|${name}($|[^A-Z])|\\d${name}\\d`).test(m)) return name; // RTD before the 2-letter names
+  return "";
 }
 function normWire(v) {
   const m = /([2-4])\s*-?\s*WIRE/.exec(v.toUpperCase());
@@ -92,17 +130,19 @@ const isSpare = (c) => !c || c.tag.toUpperCase().includes("SPARE") || ["", "SPAR
 
 export async function readIoExcel(JSZip, data, filename = "", tpl = null, progress = null) {
   const wb = await openWorkbook(JSZip, data);
-  let sheet = null, hdr = null, col = null;
-  for (const sh of wb.sheets) {
+  let sheet = null, hdr = null, col = null, score = 0;
+  for (const sh of wb.sheets) { // the sheet whose header names the most known columns (an IO list is often next to summary sheets)
     const head = [];
     await wb.scan(sh, (r, values) => { head.push([r, values]); return r < 30; });
-    [hdr, col] = findHeader(head);
-    if (hdr) { sheet = sh; break; }
+    const [r, c, s] = findHeader(head);
+    if (r && s > score) [sheet, hdr, col, score] = [sh, r, c, s];
   }
-  if (!sheet) throw new Error("no sheet has a header row with 'MODULE NAME' and 'CHANNEL'");
-  const missing = ["module", "channel", "tag", "desc"].filter((k) => !(k in col));
-  if (missing.length) throw new Error(`columns not found in sheet '${sheet.name}': ${missing.join(", ")}`);
+  if (!sheet) throw new Error("no sheet has a header row with 'MODULE NAME' (or IOM / CARD / SLOT) and 'CHANNEL' and a 'FIELD TAG' / 'TAG NO' / 'DESCRIPTION' column");
   const groups = col._groups; delete col._groups;
+  const colWarnings = [];
+  if (!("tag" in col)) colWarnings.push(`No FIELD TAG / TAG NO column in sheet '${sheet.name}': ${"c300" in col ? "the DCS tag is used as field tag" : "the field tags are left empty"}.`);
+  if (!("desc" in col)) colWarnings.push(`No DESCRIPTION column in sheet '${sheet.name}': the descriptions stay SPARE.`);
+  if (!("module" in col)) colWarnings.push(`No MODULE NAME column in sheet '${sheet.name}': modules are told apart by ${MODULE_ID.filter((k) => k in col).map((k) => k.toUpperCase()).join(" / ")}.`);
 
   const yellowCols = [...new Set(["tag", "desc", "module", "channel"].filter((k) => k in col).map((k) => col[k]))].sort((a, b) => a - b);
   const rows = [];
@@ -112,9 +152,13 @@ export async function readIoExcel(JSZip, data, filename = "", tpl = null, progre
     const rec = {};
     for (const k of ROW_KEYS) rec[k] = cellValue(cells, col[k]);
     for (const [g, [nameI, termIs]] of Object.entries(groups)) { rec[g] = cellValue(cells, nameI); rec[g + "T"] = termIs.map((i) => cellValue(cells, i)); }
+    if (!("tag" in col)) rec.tag = rec.c300;
     if (!(rec.module || rec.channel || rec.tag || rec.desc)) { blankRun++; return blankRun <= 300; } // formatted but empty rows below the data
     blankRun = 0;
     rec.row = r;
+    rec.ch = parseChannel(rec.channel);
+    // the module a row belongs to: its MODULE NAME, else controller / link / rack / slot / IOM ('C1 L1 IOM 3')
+    rec.key = rec.module || MODULE_ID.filter((k) => real(rec[k])).map((k) => (k === "iom" ? "IOM " : k === "slot" ? "SLOT " : k === "rack" ? "RACK " : "") + rec[k]).join(" ");
     let yellow = 0;
     for (const i of yellowCols) if (flags[i]) yellow++;
     rec.yellow = yellowCols.length > 0 && yellow >= Math.max(2, Math.floor(yellowCols.length / 2));
@@ -133,14 +177,29 @@ export async function readIoExcel(JSZip, data, filename = "", tpl = null, progre
     mode = "module";
     const index = new Map();
     for (const rec of rows) {
-      const key = rec.module || "(no module name)";
+      const key = rec.key || "(no module name)";
       if (!index.has(key)) { index.set(key, groupsOfRows.length); groupsOfRows.push([]); }
       groupsOfRows[index.get(key)].push(rec);
     }
   }
 
   const templates = (tpl || {}).templates || {};
-  const modules = groupsOfRows.map((g, n) => makeModule(n + 1, g, templates));
+  const known = new Set(Object.values(templates).map((t) => t.type).filter(Boolean));
+  for (const rec of rows) rec.type = normType(rec, known);
+  // Channels counted from 0 in the workbook and from 1 in the templates (or the other way round): the rows are moved onto the
+  // channel of the drawing, per IO type ('CH0' of the workbook is CH1 of the sheet)
+  const shift = {};
+  for (const type of new Set(rows.map((rec) => rec.type))) {
+    const tchs = Object.values(templates).filter((t) => t.type === type && !t.perChannel).flatMap((t) => t.channels);
+    const xchs = rows.filter((rec) => rec.type === type && rec.ch !== null).map((rec) => rec.ch);
+    if (!tchs.length || !xchs.length) continue;
+    const tBase = Math.min(...tchs), xBase = xchs.includes(0) ? 0 : 1;
+    if (tBase <= 1 && tBase !== xBase) {
+      shift[type] = tBase - xBase;
+      colWarnings.push(`${type} channels are counted from ${xBase} in the workbook and from ${tBase} in the template: workbook channel ${xBase} is drawn as CH${tBase}, ${xBase + 1} as CH${tBase + 1} ...`);
+    }
+  }
+  const modules = groupsOfRows.map((g, n) => makeModule(n + 1, g, templates, shift));
   const has = new Set(["iop", "iota", "iotype", "link", "module", "iom", "sysgroup"].filter((k) => k in col));
   has.add("chlabel"); // 'CH5' of a one-channel sheet
   if (["sys1", "sys2", "sys3"].some((k) => k in col)) has.add("sys");
@@ -159,7 +218,15 @@ export async function readIoExcel(JSZip, data, filename = "", tpl = null, progre
     for (const w of m.missing) (target[w] ||= []).push(m.module);
     delete m.need; delete m.fallback; delete m.missing;
   }
-  const warnings = [];
+  const warnings = [...colWarnings];
+  const blankRoles = new Set();
+  for (const m of modules) for (const sh of m.sheets) if (sh.offset) for (const f of templates[sh.template].terms) if (!has.has(f.role) && !(f.relay && has.has("rtp"))) blankRoles.add(f.role);
+  if (blankRoles.size) warnings.push(`Some sheets repeat a template for higher channels, and the workbook has no ${[...blankRoles].map((r) => ({ sys: "TB1 / TB2 (system TB)", tb: "TB NAME + terminal", rtp: "RTP NAME + terminal", jb: "JB NAME + terminal" })[r] || r).join(", ")} columns: those terminal numbers are left empty there. Add the columns to the workbook, or import a template for those channels.`);
+  // A field tag on two channels is almost always a copy / paste error in the workbook
+  const tagRows = new Map();
+  for (const rec of rows) if (real(rec.tag) && !/SPARE/i.test(rec.tag)) tagRows.set(rec.tag, [...(tagRows.get(rec.tag) || []), rec.row]);
+  const twice = [...tagRows].filter(([, rs]) => rs.length > 1);
+  if (twice.length) warnings.push(`${twice.length} field tag(s) are on more than one channel: ${twice.slice(0, 6).map(([tag, rs]) => `${tag} (rows ${rs.join(", ")})`).join("; ")}${twice.length > 6 ? " …" : ""}.`);
   // Placeholders of the template ('LINK No: XXXX') the workbook has no column for stay as drawn
   for (const [key, label] of [["iota", "IOTA"], ["link", "LINK No"], ["iom", "IOM number"], ["module", "MODULE NAME"], ["iop", "IOP"]]) {
     if (has.has(key)) continue;
@@ -192,12 +259,15 @@ export async function readIoExcel(JSZip, data, filename = "", tpl = null, progre
  *  template draws it; a column that is empty for this module / channel gives an empty text (a wrong number is worse than none). */
 export function sheetTexts(m, sh, t, has) {
   const out = {};
-  const values = { iop: m.iop, iota: m.iota, iotype: m.iotype || m.type, link: m.link, module: m.module, iom: m.iom, tbname: sh.names.tb, rtpname: sh.names.rtp,
-    sysgroup: sh.sysgroup, jbname: sh.jb, chlabel: String(sh.first) };
+  const chNo = (f, ch) => (f.prefix ?? "CH") + String(ch).padStart(f.pad || 0, "0");
+  const values = { iop: m.iop, iota: m.iota, iotype: m.type || m.iotype, link: m.link, module: m.module, iom: m.iom, tbname: sh.names.tb, rtpname: sh.names.rtp,
+    sysgroup: sh.sysgroup, jbname: sh.jb };
   for (const [key, f] of Object.entries(t.header)) {
+    if (key === "chlabel") { out[f.h] = chNo(f, sh.first); continue; }
     const v = values[key] ?? "";
     out[f.h] = has.has(key) ? f.prefix + (real(v) ? v : "") : f.t;
   }
+  for (const f of t.chlabels || []) out[f.h] = chNo(f, f.ch + (sh.offset || 0)); // the channel numbers of this sheet
   const jbf = t.header.jbname, slots = t.jblines || [];
   for (const f of slots) out[f.h] = "";
   if (jbf && has.has("jbname") && slots.length) {
@@ -221,7 +291,8 @@ export function sheetTexts(m, sh, t, has) {
     out[f.h] = has.has("jbname") && c && real(c.jb) ? c.jb : "";
   }
   for (const f of t.terms) {
-    if (!has.has(f.role) && !(f.relay && has.has("rtp"))) { out[f.h] = f.t; continue; }
+    // no column for it: the number as drawn - except on a repeated sheet (CH9-16 on a CH1-8 template), where it would be CH1-8's
+    if (!has.has(f.role) && !(f.relay && has.has("rtp"))) { out[f.h] = sh.offset ? "" : f.t; continue; }
     const c = sh.channels[index.get(f.ch)];
     const vals = c ? c.terms[f.role] || [] : [];
     const rtp = c ? c.terms.rtp || [] : [];
@@ -273,25 +344,42 @@ function pickTemplates(mtype, channels, templates) {
   return [ids, missing, kinds];
 }
 
-function makeModule(n, group, templates) {
+const MAX_CHANNEL = 256; // a channel number above this is a typing error, not a module that big
+
+function makeModule(n, group, templates, shift = {}) {
   const head = {};
   for (const k of MODULE_KEYS) head[k] = mostCommon(group.map((rec) => rec[k]));
-  head.type = mostCommon(group.map((rec) => normType(rec)));
+  head.type = mostCommon(group.map((rec) => rec.type));
   const m = { index: n, ...head, startRow: group[0].row, endRow: group[group.length - 1].row, rows: group.length };
+  if (!m.module) m.module = mostCommon(group.map((rec) => rec.key)) || `Module ${n}`; // the name shown on the page (not written into the drawing)
   const warn = [];
   const names = [...new Set(group.filter((r) => r.module).map((r) => r.module))].sort();
   if (names.length > 1) warn.push(`Several MODULE NAMEs in one block: ${names.join(", ")}.`);
-  const types = [...new Set(group.filter((r) => r.iotype).map((r) => normType(r)))].sort();
+  const types = [...new Set(group.filter((r) => r.iotype).map((r) => r.type))].sort();
   if (types.length > 1) warn.push(`Several IO types in one block: ${types.join(", ")}.`);
+  if (!m.type) warn.push("The IO type of this module is not known (no IO TYPE column, part number or module name that names it).");
 
-  // a template of one channel per sheet does not say how many channels the module has: only the ranges of the others do
+  // The channel range of the templates of this type (a template of one channel per sheet does not say how many channels the module
+  // has: only the ranges of the others do). When the workbook has more channels than the templates draw, the templates are drawn
+  // again for the next channels (CH9-16 on a second CH1-8 sheet), as long as the templates can renumber their channel labels.
   const same = Object.values(templates).filter((t) => t.type === m.type && !t.perChannel);
-  const capacity = same.length ? Math.max(...same.flatMap((t) => t.channels)) : ["DI", "DO"].includes(m.type) ? 32 : 16;
+  const tchs = same.flatMap((t) => t.channels);
+  const lo = tchs.length ? Math.min(...tchs) : (shift[m.type] ?? 0) < 0 ? 0 : 1;
+  const hi = tchs.length ? Math.max(...tchs) : ["DI", "DO"].includes(m.type) ? 32 : 16;
+  const span = hi - lo + 1;
+  const toCh = (rec) => (rec.ch === null ? null : rec.ch + (shift[m.type] || 0));
+  const top = Math.max(0, ...group.map(toCh).filter((ch) => ch !== null && ch <= MAX_CHANNEL));
+  const repeat = same.length > 0 && same.every((t) => t.chlabels && t.chlabels.length === t.channels.length);
+  const pages = repeat && top > hi ? Math.ceil((top - lo + 1) / span) : 1;
+  const capacity = lo - 1 + pages * span;
+  if (pages > 1) warn.push(`The workbook has channels up to CH${top}, the template${same.length > 1 ? "s" : ""} draw${same.length > 1 ? "" : "s"} CH${lo}-${hi}: ${same.length > 1 ? "they are" : "it is"} drawn ${pages} times (CH${lo}-${hi}, CH${lo + span}-${hi + span}${pages > 2 ? " …" : ""}).`);
+  else if (!repeat && same.length && top > hi) warn.push(`The template set is older than this program version: import the templates again to draw CH${hi + 1}-${top} too.`);
   const channels = {};
   for (const rec of group) {
-    const ch = /^\d+$/.test(rec.channel) ? parseInt(rec.channel, 10) : null;
-    if (ch === null || ch in channels) { warn.push(`Row ${rec.row}: CHANNEL '${rec.channel}' is missing or repeated - row skipped.`); continue; }
-    if (!(ch >= 1 && ch <= capacity)) { warn.push(`Row ${rec.row}: CHANNEL ${ch} is outside 1-${capacity} - row skipped.`); continue; }
+    const ch = toCh(rec);
+    if (ch === null) { warn.push(`Row ${rec.row}: CHANNEL '${rec.channel}' is not a channel number - row skipped.`); continue; }
+    if (ch in channels) { warn.push(`Row ${rec.row}: CHANNEL ${rec.channel} is repeated (row ${channels[ch].row} has it too) - row skipped.`); continue; }
+    if (!(ch >= lo && ch <= capacity)) { warn.push(`Row ${rec.row}: CHANNEL ${rec.channel} is outside ${lo}-${capacity} - row skipped.`); continue; }
     const c = {};
     for (const k of ["row", "tag", "c300", "desc", "dcs_desc", "wire", "sysgroup"]) c[k] = rec[k];
     c.tb = rec.tb ?? ""; c.rtp = rec.rtp ?? ""; c.jb = rec.jb ?? "";
@@ -301,11 +389,11 @@ function makeModule(n, group, templates) {
     [c.t1, c.t2, c.t3] = [...tbT, "", "", ""].slice(0, 3);
     channels[ch] = c;
   }
-  const absent = []; for (let ch = 1; ch <= capacity; ch++) if (!(ch in channels)) absent.push(ch);
+  const absent = []; for (let ch = lo; ch <= capacity; ch++) if (!(ch in channels)) absent.push(ch);
   if (absent.length) warn.push(`No Excel row for CH${absent.slice(0, 10).join(", CH")}${absent.length > 10 ? " …" : ""} - shown as SPARE.`);
-  m.capacity = capacity;
+  m.capacity = capacity - lo + 1;
   m.used = Object.values(channels).filter((c) => !isSpare(c)).length;
-  m.spare = capacity - m.used;
+  m.spare = m.capacity - m.used;
 
   const [ids, missing, kinds] = pickTemplates(m.type, channels, templates);
   if (!Object.keys(templates).length) warn.push("No template set is loaded.");
@@ -315,8 +403,9 @@ function makeModule(n, group, templates) {
   if (kinds.length > 1 && !ids.every((i) => templates[i].perChannel)) warn.push("Module mixes " + kinds.join(" and ") + " channels: one sheet of each; the other kind is marked 'REFER ... SHEET'.");
 
   const sheets = [];
-  for (const tid of ids) {
-    const t = templates[tid];
+  for (let page = 0; page < pages; page++) for (const tid of ids) {
+    const t = templates[tid], offset = page * span;
+    if (t.perChannel && page) continue;
     if (t.perChannel) {
       // one sheet for every channel of the workbook, spare ones too (drawn as SPARE, so no channel number is missing in the set).
       // A channel goes to the template of its own wiring; when there is none, to this one (see pickTemplates)
@@ -334,7 +423,8 @@ function makeModule(n, group, templates) {
       }
       continue;
     }
-    const rowsOut = t.channels.map((ch) => {
+    const chs = t.channels.map((ch) => ch + offset);
+    const rowsOut = chs.map((ch) => {
       const c = channels[ch];
       let refer = "";
       if (c && kinds.length > 1 && !isSpare(c)) { // a spare channel is spare on every sheet
@@ -349,7 +439,8 @@ function makeModule(n, group, templates) {
     for (const c of present) if (real(c.jb) && !jb.includes(c.jb)) jb.push(c.jb);
     const tb = pick("tb"), rtp = pick("rtp");
     sheets.push({
-      uid: tid, per: false, template: tid, first: t.channels[0], last: t.channels[t.channels.length - 1], tbname: tb || rtp, names: { tb: tb || rtp, rtp: rtp || tb },
+      uid: offset ? `${tid}+${offset}` : tid, per: false, template: tid, first: chs[0], last: chs[chs.length - 1], offset, chs,
+      tbname: tb || rtp, names: { tb: tb || rtp, rtp: rtp || tb },
       sysgroup: pick("sysgroup"), jb: jb.join(" / "), jbs: jb, channels: rowsOut, used: present.filter((c) => !isSpare(c) && !c.refer).length,
     });
   }

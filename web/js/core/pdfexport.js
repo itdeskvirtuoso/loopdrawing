@@ -58,7 +58,7 @@ export async function buildPdf(lib, engine, set, blanks, sheets, title = "Loop d
   const fieldsOf = (tid) => {
     if (!fields[tid]) {
       const t = set.templates[tid], m = {};
-      for (const f of [...Object.values(t.header), ...(t.jblines || []), ...(t.jbtags || []), ...t.tags, ...t.descs, ...t.terms]) m[f.h] = f;
+      for (const f of [...Object.values(t.header), ...(t.jblines || []), ...(t.jbtags || []), ...(t.chlabels || []), ...t.tags, ...t.descs, ...t.terms]) m[f.h] = f;
       fields[tid] = m;
     }
     return fields[tid];
