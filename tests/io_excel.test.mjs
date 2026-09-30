@@ -140,3 +140,15 @@ test("the templates of a type that skip a channel range are reported instead of 
   assert.ok(res.modules[0].warnings.some((w) => /not CH3, CH4/.test(w)), res.modules[0].warnings.join(" | "));
   assert.deepEqual(res.modules[0].sheets.map((s) => [s.first, s.last]), [[1, 2], [5, 6]]);
 });
+
+test("a repeated sheet goes on counting the template's terminal numbers when the workbook has no column for them", async () => {
+  const set = fakeSet();
+  set.templates.AI.chlabels = [{ h: "C1", t: "CH1", prefix: "CH", pad: 0, ch: 1 }, { h: "C2", t: "CH2", prefix: "CH", pad: 0, ch: 2 }];
+  const head = ["MODULE NAME", "CHANNEL", "CHANNEL NAME", "DESCRIPTION"]; // no TB1 / TB2 columns
+  const data = await makeXlsx([head, ["C1L1AI01", 1, "A", "a"], ["C1L1AI01", 2, "B", "b"], ["C1L1AI01", 3, "C", "c"], ["C1L1AI01", 4, "D", "d"]]);
+  const res = await readIoExcel(JSZip, data, "x.xlsx", set);
+  const [p1, p2] = res.modules[0].sheets;
+  assert.deepEqual([p1.texts.S1, p1.texts.S2], ["1", "2"]); // as the template draws them
+  assert.deepEqual([p2.texts.C1, p2.texts.C2, p2.texts.S1, p2.texts.S2], ["CH3", "CH4", "3", "4"]); // CH3-4: the column goes on
+  assert.ok(res.warnings.some((w) => /go on counting/.test(w)));
+});

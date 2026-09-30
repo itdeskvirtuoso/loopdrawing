@@ -219,9 +219,18 @@ export async function readIoExcel(JSZip, data, filename = "", tpl = null, progre
     delete m.need; delete m.fallback; delete m.missing;
   }
   const warnings = [...colWarnings];
-  const blankRoles = new Set();
-  for (const m of modules) for (const sh of m.sheets) if (sh.offset) for (const f of templates[sh.template].terms) if (!has.has(f.role) && !(f.relay && has.has("rtp"))) blankRoles.add(f.role);
-  if (blankRoles.size) warnings.push(`Some sheets repeat a template for higher channels, and the workbook has no ${[...blankRoles].map((r) => ({ sys: "TB1 / TB2 (system TB)", tb: "TB NAME + terminal", rtp: "RTP NAME + terminal", jb: "JB NAME + terminal" })[r] || r).join(", ")} columns: those terminal numbers are left empty there. Add the columns to the workbook, or import a template for those channels.`);
+  const ROLE_COLUMN = { sys: "TB1 / TB2 (system TB)", tb: "TB NAME + terminal", rtp: "RTP NAME + terminal", jb: "JB NAME + terminal" };
+  const goneRoles = new Set(), countedRoles = new Set();
+  for (const m of modules) for (const sh of m.sheets) {
+    if (!sh.offset) continue;
+    for (const f of templates[sh.template].terms) {
+      if (has.has(f.role) || (f.relay && has.has("rtp"))) continue;
+      ((m.termSteps || {})[f.role + "|" + f.side] ? countedRoles : goneRoles).add(f.role);
+    }
+  }
+  const roleList = (set) => [...set].map((r) => ROLE_COLUMN[r] || r).join(", ");
+  if (countedRoles.size) warnings.push(`Some sheets repeat a template for higher channels and the workbook has no ${roleList(countedRoles)} columns: those terminal numbers go on counting from the template (CH1-8 draws 1-24, so CH9-16 gets 25-48). Add the columns to the workbook if the panel is wired differently.`);
+  if (goneRoles.size) warnings.push(`Some sheets repeat a template for higher channels, and the workbook has no ${roleList(goneRoles)} columns while the template does not number them in one run: those terminal numbers are left empty there. Add the columns to the workbook, or import a template for those channels.`);
   // A field tag on two channels is almost always a copy / paste error in the workbook
   const tagRows = new Map();
   for (const rec of rows) if (real(rec.tag) && !/SPARE/i.test(rec.tag)) tagRows.set(rec.tag, [...(tagRows.get(rec.tag) || []), rec.row]);
@@ -292,7 +301,14 @@ export function sheetTexts(m, sh, t, has) {
   }
   for (const f of t.terms) {
     // no column for it: the number as drawn - except on a repeated sheet (CH9-16 on a CH1-8 template), where it would be CH1-8's
-    if (!has.has(f.role) && !(f.relay && has.has("rtp"))) { out[f.h] = sh.offset ? "" : f.t; continue; }
+    if (!has.has(f.role) && !(f.relay && has.has("rtp"))) {
+      if (!sh.offset) { out[f.h] = f.t; continue; }
+      // a repeated sheet (CH9-16 on a CH1-8 template): its column goes on counting where the template stopped (25-48), and
+      // when the column cannot be counted on, the number is left empty - CH1-8's numbers would be wrong here
+      const step = (m.termSteps || {})[f.role + "|" + f.side];
+      out[f.h] = step ? String(parseInt(f.t, 10) + step * sh.page) : "";
+      continue;
+    }
     const c = sh.channels[index.get(f.ch)];
     const vals = c ? c.terms[f.role] || [] : [];
     const rtp = c ? c.terms.rtp || [] : [];
@@ -345,6 +361,31 @@ function pickTemplates(mtype, channels, templates) {
 }
 
 const MAX_CHANNEL = 256; // a channel number above this is a typing error, not a module that big
+
+/** How far every terminal column of the templates of one IO type runs: { "sys|0": 48 } when they draw 1..48 there. A column
+ *  counts only when it has the same number of terminals on every channel and its numbers are one run without a gap - then a
+ *  template drawn again for higher channels can go on counting (CH9-16 gets 25-48 where CH1-8 has 1-24). */
+function columnSteps(same) {
+  const cols = new Map();
+  for (const t of same) {
+    for (const f of t.terms) {
+      if (f.relay) continue;
+      const key = f.role + "|" + f.side;
+      if (!cols.has(key)) cols.set(key, { vals: new Set(), perCh: new Map(), ok: true });
+      const c = cols.get(key);
+      if (!/^\d+$/.test(String(f.t).trim())) { c.ok = false; continue; }
+      c.vals.add(parseInt(f.t, 10));
+      const ch = t.file + "|" + f.ch;
+      c.perCh.set(ch, (c.perCh.get(ch) || 0) + 1);
+    }
+  }
+  const out = {};
+  for (const [key, c] of cols) {
+    const v = [...c.vals].sort((a, b) => a - b);
+    if (c.ok && v.length && new Set(c.perCh.values()).size === 1 && v[v.length - 1] - v[0] + 1 === v.length) out[key] = v.length;
+  }
+  return out;
+}
 
 function makeModule(n, group, templates, shift = {}) {
   const head = {};
@@ -414,6 +455,7 @@ function makeModule(n, group, templates, shift = {}) {
   if (kinds.length > 1 && !ids.every((i) => templates[i].perChannel)) warn.push("Module mixes " + kinds.join(" and ") + " channels: one sheet of each; the other kind is marked 'REFER ... SHEET'.");
 
   const sheets = [];
+  m.termSteps = pages > 1 ? columnSteps(same) : {};
   for (let page = 0; page < pages; page++) for (const tid of ids) {
     const t = templates[tid], offset = page * span;
     if (t.perChannel && page) continue;
@@ -451,7 +493,7 @@ function makeModule(n, group, templates, shift = {}) {
     for (const c of present) if (real(c.jb) && !jb.includes(c.jb)) jb.push(c.jb);
     const tb = pick("tb"), rtp = pick("rtp");
     sheets.push({
-      uid: offset ? `${tid}+${offset}` : tid, per: false, template: tid, first: Math.min(...chs), last: Math.max(...chs), offset, chs,
+      uid: offset ? `${tid}+${offset}` : tid, per: false, template: tid, first: Math.min(...chs), last: Math.max(...chs), offset, page, chs,
       tbname: tb || rtp, names: { tb: tb || rtp, rtp: rtp || tb },
       sysgroup: pick("sysgroup"), jb: jb.join(" / "), jbs: jb, channels: rowsOut, used: present.filter((c) => !isSpare(c) && !c.refer).length,
     });
