@@ -1011,7 +1011,9 @@
     u.append(title, bar, leg);
     pane.append(u);
 
-    t.channels.forEach((ch0, i) => {
+    // The channels are listed by their number, whatever order the template draws its channel labels in
+    for (const i of t.channels.map((ch0, k) => k).sort((a, b) => t.channels[a] - t.channels[b])) {
+      const ch0 = t.channels[i];
       const ch = x.s.per ? x.s.first : ch0 + (x.s.offset || 0);
       const c = x.s.channels[i];
       const spare = !c || /SPARE/i.test(c.tag || "") || (!c.tag && !c.desc);
@@ -1034,7 +1036,7 @@
       row.onclick = () => focusChannel(ch);
       row.dataset.ch = ch;
       pane.append(row);
-    });
+    }
   }
 
   function renderFeed() {
@@ -2044,7 +2046,7 @@
       const chips = (a, cls) => a.map((x) => `<span class="tag-chip ${cls || ""}">${esc(x)}</span>`).join("");
       cards += `<div class="card" style="margin-bottom:14px"><div class="card-head"><h3>${icon("table")}${esc(TPL.name)}</h3><span class="note">Frame ${esc(TPL.frame || "none")} · sheet ${TPL.box ? Math.round(TPL.box[2] - TPL.box[0]) + " × " + Math.round(TPL.box[3] - TPL.box[1]) : ""} units · ${ts.length} templates</span></div>
         <div class="table-wrap"><table class="tbl"><thead><tr><th>Template</th><th>File</th><th>Type</th><th>Wiring</th><th>Channels</th><th>Header texts found</th><th>Terminals found</th><th>Sheet no. / total</th></tr></thead><tbody>
-        ${ts.map(([id, t]) => `<tr><td><b>${esc(id)}</b></td><td class="muted">${esc(t.file)}</td><td><span class="chip" style="--c:${typeColor(t.type)}">${esc(t.type || "?")}</span></td><td>${esc(t.wire || "—")}</td><td class="num">${t.perChannel ? "1 sheet per channel" : `CH${t.channels[0]}–${t.channels[t.channels.length - 1]}`}</td>
+        ${ts.map(([id, t]) => `<tr><td><b>${esc(id)}</b></td><td class="muted">${esc(t.file)}</td><td><span class="chip" style="--c:${typeColor(t.type)}">${esc(t.type || "?")}</span></td><td>${esc(t.wire || "—")}</td><td class="num">${t.perChannel ? "1 sheet per channel" : `CH${Math.min(...t.channels)}–${Math.max(...t.channels)}`}</td>
           <td><div class="tags">${chips(Object.keys(t.header).map((k) => HEADER_LABELS[k] || k), "g")}<span class="tag-chip g">Field tag ×${t.tags.length}</span><span class="tag-chip g">Description ×${t.descs.length}</span></div></td>
           <td><div class="tags">${t.terms.length ? chips(roleCount(t), "g") + `<span class="tag-chip">${t.terms.length} numbers</span>` : '<span class="tag-chip w">none</span>'}</div></td>
           <td>${t.sheetno ? '<span class="tag-chip g">sheet ✓</span>' : '<span class="tag-chip r">sheet ✗</span>'} ${t.frameTotal ? '<span class="tag-chip g">total ✓</span>' : '<span class="tag-chip w">total ✗</span>'}</td></tr>`).join("")}

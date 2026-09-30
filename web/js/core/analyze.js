@@ -89,6 +89,31 @@ export function withValue(label, texts) {
   return { ...best[1], prefix: "", label: label.t };
 }
 
+/** The channel label a text belongs to (an index into chs): the label on its own row, and of those the nearest one.
+ *  A template that draws its channels in one column is decided by the row alone; a template with two columns of channels
+ *  (CH1-8 left, CH9-16 right) has two labels on every row, and the nearer one owns the text. */
+export function channelOf(chs, t, band) {
+  const tx = textCentre(t)[0];
+  return minBy(chs.map((_, i) => i), (i) => {
+    const dy = Math.abs(chs[i].y - t.y); // the baseline tells the rows apart; the size of the texts does not matter
+    return [dy <= band ? 0 : dy, Math.abs(textCentre(chs[i])[0] - tx)];
+  });
+}
+
+/** One text per channel ('FIELD TAG:', 'DESCRIPTION:'), sorted onto the channel labels: result[i] belongs to chs[i]. When the
+ *  texts cannot be matched to the labels one by one they are left in the order they are drawn (and it is reported). */
+function perChannelTexts(chs, list, band, what, warn) {
+  if (list.length !== chs.length) return list;
+  const idx = list.map((t) => channelOf(chs, t, band));
+  if (new Set(idx).size !== list.length) {
+    warn.push(`the '${what}' texts do not sit one per channel label - they are filled in the order they are drawn`);
+    return list;
+  }
+  const out = [];
+  idx.forEach((i, k) => { out[i] = list[k]; });
+  return out;
+}
+
 // ------------------------------------------------------------------------------------------------ frame texts
 /** TEXT entities of a block (and of the blocks inserted in it) as [{e, m}]; m puts them into the drawing. */
 export function walkTexts(doc, blockName) {
@@ -355,22 +380,34 @@ export function analyze(doc, tid, frameName, box, forceType = null) {
   // the frame of the set (an xref bound into the template), or - a drawing that has its own frame - every inserted block
   const frameTexts = (frameName ? walkTexts(doc, frameName) : walkAllTexts(doc)).map(({ e, m }) => frameTextInfo(e, m));
 
-  const chs = texts.filter((t) => reFull(CH_LABEL, strip(t.t))).sort((a, b) => b.y - a.y);
-  if (!chs.length) throw new TemplateError("no 'CH1, CH2 ...' channel labels found");
+  // Every channel label of the drawing, top to bottom (and left to right, for a template with two columns of channels)
+  const chTexts = texts.filter((t) => reFull(CH_LABEL, strip(t.t))).sort((a, b) => b.y - a.y || a.x - b.x);
+  if (!chTexts.length) throw new TemplateError("no 'CH1, CH2 ...' channel labels found");
+  // A template may write the same channel label twice (once at the module, once at the field device): the channel exists once,
+  // but every one of its labels is renumbered when the template is drawn again for higher channels
+  const chs = [], chSeen = new Set();
+  for (const c of chTexts) { const n = chNumber(strip(c.t)); if (!chSeen.has(n)) { chSeen.add(n); chs.push(c); } }
+  if (chs.length !== chTexts.length)
+    warn.push(`${chTexts.length} channel labels for ${chs.length} channels: a label is drawn more than once - every one of them is renumbered`);
+  // The rows of the channels and the distance between them: a row holds one channel (one column of channels) or several
+  const rowYs = [...new Set(chs.map((c) => r2(textCentre(c)[1])))].sort((a, b) => b - a);
+  const chPitch = rowYs.length > 1 ? median(rowYs.slice(0, -1).map((y, i) => y - rowYs[i + 1])) : 100;
+  const band = 0.45 * chPitch; // a text this near the height of a label is on its row
   const perCh = (pats) => pats.map((p) => find(texts, p)).find((m) => m.length === chs.length) || find(texts, pats[0]); // the first label there once per channel
-  let tags = [...perCh(TAG_LABELS)].sort((a, b) => b.y - a.y);
-  let descs = perCh(DESC_LABELS).filter((t) => !tags.includes(t)).sort((a, b) => b.y - a.y);
+  const byRow = (a, b) => b.y - a.y || a.x - b.x;
+  let tags = perChannelTexts(chs, [...perCh(TAG_LABELS)].sort(byRow), band, "FIELD TAG:", warn);
+  let descs = perChannelTexts(chs, perCh(DESC_LABELS).filter((t) => !tags.includes(t)).sort(byRow), band, "DESCRIPTION:", warn);
   if (!(tags.length === descs.length && descs.length === chs.length))
     throw new TemplateError(`${chs.length} channel labels but ${tags.length} 'FIELD TAG:' and ${descs.length} 'DESCRIPTION:' texts`);
   const channels = chs.map((c) => chNumber(strip(c.t)));
-  if (new Set(channels).size !== channels.length) throw new TemplateError(`channel labels are repeated: ${chs.map((c) => strip(c.t)).join(", ")}`);
   const perChannel = channels.length === 1; // a sheet of one channel: the workbook gives one such sheet per channel
   // The channel labels are written on every sheet, so a template of CH1-8 also draws CH9-16 of a 16 channel module ('CH01' stays 2 digits)
   const chFormat = (c) => {
     const raw = strip(c.t), d = /(\d+)$/.exec(raw)[1];
     return { prefix: raw.slice(0, raw.length - d.length), pad: d.length > 1 && d[0] === "0" ? d.length : 0 };
   };
-  const chlabels = perChannel ? [] : chs.map((c, i) => ({ ...c, ...chFormat(c), ch: channels[i] }));
+  // On a one-channel template the label is filled as the sheet's channel (header.chlabel), so only a second one is listed here
+  const chlabels = chTexts.filter((c) => !perChannel || c.h !== chs[0].h).map((c) => ({ ...c, ...chFormat(c), ch: chNumber(strip(c.t)) }));
 
   const x1 = box[2];
   const rightLimit = x1 - 115; // inner border of the frame (x1 - 85) and a margin, so long texts never touch it
@@ -422,9 +459,8 @@ export function analyze(doc, tid, frameName, box, forceType = null) {
 
   // Terminal numbers next to every channel: columns of numbers, told apart by the label above them
   let terms = [];
-  const pitch = chs.length > 1 ? median(chs.slice(0, -1).map((a, i) => a.y - chs[i + 1].y)) : 100;
   const tagX = Math.min(...tags.map((t) => t.x));
-  const lo = chs[chs.length - 1].y - 0.6 * pitch, hi = chs[0].y + 0.6 * pitch;
+  const lo = Math.min(...chs.map((c) => c.y)) - 0.6 * chPitch, hi = Math.max(...chs.map((c) => c.y)) + 0.6 * chPitch;
   const cand = texts.filter((t) => reFull("\\d+", strip(t.t)) && t.x < tagX - 20 && lo <= t.y && t.y <= hi && (!sheetno || t.h !== sheetno.h));
   let cols = [];
   for (const t of [...cand].sort((a, b) => a.x - b.x)) {
@@ -454,7 +490,7 @@ export function analyze(doc, tid, frameName, box, forceType = null) {
     const side = seenSide[role];
     const rows = new Map();
     for (const t of c) {
-      const i = minBy(chs.map((_, i) => i), (i) => Math.abs(chs[i].y - t.y));
+      const i = channelOf(chs, t, band);
       if (!rows.has(i)) rows.set(i, []);
       rows.get(i).push(t);
     }
@@ -510,6 +546,8 @@ export function analyze(doc, tid, frameName, box, forceType = null) {
 }
 
 // ------------------------------------------------------------------------------------------------ ids of the templates
+const firstCh = (info) => Math.min(...info.channels); // the lowest channel a template draws (its labels may be drawn bottom up)
+
 export function assignIds(found) {
   const groups = new Map();
   for (const [fname, info] of found) {
@@ -527,12 +565,12 @@ export function assignIds(found) {
       for (const it of items) if (it !== keepOne) notes.push(`${it[0]} is not used: ${keepOne[0]} (one sheet per channel) covers ${base}`);
       items = [keepOne];
     }
-    items.sort((a, b) => a[1].channels[0] - b[1].channels[0] || (a[0].toLowerCase() < b[0].toLowerCase() ? -1 : a[0].toLowerCase() > b[0].toLowerCase() ? 1 : 0));
+    items.sort((a, b) => firstCh(a[1]) - firstCh(b[1]) || (a[0].toLowerCase() < b[0].toLowerCase() ? -1 : a[0].toLowerCase() > b[0].toLowerCase() ? 1 : 0));
     const keep = [];
     for (const it of items) {
-      if (keep.length && keep[keep.length - 1][1].channels[0] === it[1].channels[0]) {
+      if (keep.length && firstCh(keep[keep.length - 1][1]) === firstCh(it[1])) {
         const k = keep[keep.length - 1];
-        notes.push(`${k[0]} and ${it[0]} are both ${base} CH${it[1].channels[0]}-${it[1].channels[it[1].channels.length - 1]}: ${it[0]} is used`);
+        notes.push(`${k[0]} and ${it[0]} are both ${base} CH${firstCh(it[1])}-${Math.max(...it[1].channels)}: ${it[0]} is used`);
         keep[keep.length - 1] = it;
       } else keep.push(it);
     }

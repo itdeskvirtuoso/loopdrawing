@@ -267,7 +267,7 @@ export function sheetTexts(m, sh, t, has) {
     const v = values[key] ?? "";
     out[f.h] = has.has(key) ? f.prefix + (real(v) ? v : "") : f.t;
   }
-  for (const f of t.chlabels || []) out[f.h] = chNo(f, f.ch + (sh.offset || 0)); // the channel numbers of this sheet
+  for (const f of t.chlabels || []) out[f.h] = chNo(f, sh.per ? sh.first : f.ch + (sh.offset || 0)); // the channel numbers of this sheet
   const jbf = t.header.jbname, slots = t.jblines || [];
   for (const f of slots) out[f.h] = "";
   if (jbf && has.has("jbname") && slots.length) {
@@ -327,7 +327,7 @@ function terminalValues(rec) {
 /** [template ids, missing kinds, wiring kinds of the channels] for a module of this IO type. */
 function pickTemplates(mtype, channels, templates) {
   const group = Object.entries(templates).filter(([, t]) => t.type === mtype)
-    .sort((a, b) => (a[1].wire < b[1].wire ? -1 : a[1].wire > b[1].wire ? 1 : 0) || a[1].channels[0] - b[1].channels[0]);
+    .sort((a, b) => (a[1].wire < b[1].wire ? -1 : a[1].wire > b[1].wire ? 1 : 0) || Math.min(...a[1].channels) - Math.min(...b[1].channels));
   if (!group.length) return [[], [mtype || "?"], []];
   if (!group.some(([, t]) => t.wire)) return [group.map(([tid]) => tid), [], []];
   const def = group[0][1].wire;
@@ -362,18 +362,29 @@ function makeModule(n, group, templates, shift = {}) {
   // The channel range of the templates of this type (a template of one channel per sheet does not say how many channels the module
   // has: only the ranges of the others do). When the workbook has more channels than the templates draw, the templates are drawn
   // again for the next channels (CH9-16 on a second CH1-8 sheet), as long as the templates can renumber their channel labels.
-  const same = Object.values(templates).filter((t) => t.type === m.type && !t.perChannel);
+  const ofType = Object.values(templates).filter((t) => t.type === m.type);
+  const same = ofType.filter((t) => !t.perChannel);
   const tchs = same.flatMap((t) => t.channels);
-  const lo = tchs.length ? Math.min(...tchs) : (shift[m.type] ?? 0) < 0 ? 0 : 1;
+  const tlo = tchs.length ? Math.min(...tchs) : (shift[m.type] ?? 0) < 0 ? 0 : 1; // the lowest / highest channel the templates draw
   const hi = tchs.length ? Math.max(...tchs) : ["DI", "DO"].includes(m.type) ? 32 : 16;
-  const span = hi - lo + 1;
+  const span = hi - tlo + 1;
   const toCh = (rec) => (rec.ch === null ? null : rec.ch + (shift[m.type] || 0));
-  const top = Math.max(0, ...group.map(toCh).filter((ch) => ch !== null && ch <= MAX_CHANNEL));
-  const repeat = same.length > 0 && same.every((t) => t.chlabels && t.chlabels.length === t.channels.length);
-  const pages = repeat && top > hi ? Math.ceil((top - lo + 1) / span) : 1;
-  const capacity = lo - 1 + pages * span;
+  const chsIn = group.map(toCh).filter((ch) => ch !== null && ch >= 0 && ch <= MAX_CHANNEL);
+  const top = Math.max(0, ...chsIn);
+  // Channels inside the range of the templates that none of them draws (CH1-8 and CH17-24 imported, CH9-16 missing): the sheets
+  // would jump over them, so they are reported instead of being drawn on the wrong template.
+  const drawn = new Set(tchs), holes = [];
+  if (tchs.length) for (let ch = tlo; ch <= hi; ch++) if (!drawn.has(ch)) holes.push(ch);
+  if (holes.length) warn.push(`The ${m.type} template(s) draw CH${tlo}-${hi} but not CH${holes.slice(0, 10).join(", CH")}${holes.length > 10 ? " …" : ""}: those channels get no sheet. Import a template that draws them.`);
+  const repeat = same.length > 0 && !holes.length && same.every((t) => t.chlabels && t.chlabels.length >= t.channels.length);
+  const pages = repeat && top > hi ? Math.ceil((top - tlo + 1) / span) : 1;
+  // A one-sheet-per-channel template draws any channel number, so when the set has no template of several channels the workbook
+  // alone says how far the module reaches: every channel from its lowest to its highest gets a sheet (missing ones as SPARE).
+  const perOnly = !same.length && ofType.some((t) => t.perChannel);
+  const lo = perOnly ? Math.min(tlo, ...chsIn) : tlo;
+  const capacity = perOnly ? Math.max(top, lo) : lo - 1 + pages * span;
   if (pages > 1) warn.push(`The workbook has channels up to CH${top}, the template${same.length > 1 ? "s" : ""} draw${same.length > 1 ? "" : "s"} CH${lo}-${hi}: ${same.length > 1 ? "they are" : "it is"} drawn ${pages} times (CH${lo}-${hi}, CH${lo + span}-${hi + span}${pages > 2 ? " …" : ""}).`);
-  else if (!repeat && same.length && top > hi) warn.push(`The template set is older than this program version: import the templates again to draw CH${hi + 1}-${top} too.`);
+  else if (!repeat && !perOnly && same.length && top > hi) warn.push(`The ${m.type} template(s) draw up to CH${hi} and cannot renumber their channel labels: CH${hi + 1}-${top} get no sheet. Import the templates again, or a template that draws them.`);
   const channels = {};
   for (const rec of group) {
     const ch = toCh(rec);
@@ -410,15 +421,16 @@ function makeModule(n, group, templates, shift = {}) {
       // one sheet for every channel of the workbook, spare ones too (drawn as SPARE, so no channel number is missing in the set).
       // A channel goes to the template of its own wiring; when there is none, to this one (see pickTemplates)
       const exact = new Set(ids.map((i) => templates[i].wire));
-      for (const ch of Object.keys(channels).map(Number).sort((a, b) => a - b)) {
-        const c = channels[ch];
-        const k = normWire(c.wire) || kinds[0];
+      for (let ch = lo; ch <= capacity; ch++) {
+        const c = channels[ch]; // no Excel row for it: the sheet is drawn, as SPARE
+        const k = (c && normWire(c.wire)) || kinds[0];
         if (t.wire && k !== t.wire && exact.has(k)) continue;
-        const tb = real(c.tb) ? c.tb : "", rtp = real(c.rtp) ? c.rtp : "";
-        const jb = real(c.jb) ? [c.jb] : [];
+        const tb = c && real(c.tb) ? c.tb : "", rtp = c && real(c.rtp) ? c.rtp : "";
+        const jb = c && real(c.jb) ? [c.jb] : [];
         sheets.push({
           uid: `${tid}@${ch}`, per: true, template: tid, first: ch, last: ch, tbname: tb || rtp, names: { tb: tb || rtp, rtp: rtp || tb },
-          sysgroup: real(c.sysgroup) ? c.sysgroup : "", jb: jb.join(" / "), jbs: jb, channels: [{ ...c, ch, refer: "" }], used: isSpare(c) ? 0 : 1,
+          sysgroup: c && real(c.sysgroup) ? c.sysgroup : "", jb: jb.join(" / "), jbs: jb, channels: [c ? { ...c, ch, refer: "" } : null],
+          used: isSpare(c) ? 0 : 1,
         });
       }
       continue;
@@ -439,11 +451,13 @@ function makeModule(n, group, templates, shift = {}) {
     for (const c of present) if (real(c.jb) && !jb.includes(c.jb)) jb.push(c.jb);
     const tb = pick("tb"), rtp = pick("rtp");
     sheets.push({
-      uid: offset ? `${tid}+${offset}` : tid, per: false, template: tid, first: chs[0], last: chs[chs.length - 1], offset, chs,
+      uid: offset ? `${tid}+${offset}` : tid, per: false, template: tid, first: Math.min(...chs), last: Math.max(...chs), offset, chs,
       tbname: tb || rtp, names: { tb: tb || rtp, rtp: rtp || tb },
       sysgroup: pick("sysgroup"), jb: jb.join(" / "), jbs: jb, channels: rowsOut, used: present.filter((c) => !isSpare(c) && !c.refer).length,
     });
   }
+  // The sheets of a module follow its channels, so the set is numbered CH1.., CH9.., CH17.. and never jumps back
+  sheets.sort((a, b) => a.first - b.first || a.last - b.last || (a.template < b.template ? -1 : a.template > b.template ? 1 : 0));
   m.sheets = sheets;
   m.warnings = warn;
   m.missing = missing;

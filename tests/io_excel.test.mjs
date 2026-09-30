@@ -24,7 +24,7 @@ test("modules are found by MODULE NAME and their texts are set by column name", 
 });
 
 test("yellow rows start a new module", async () => {
-  const data = await makeXlsx([HEAD, ["M", 1, "A", "a", 1, 2], ["M", 2, "B", "b", 3, 4], ["M", 1, "C", "c", 1, 2]], [4]);
+  const data = await makeXlsx([HEAD, ["C1L1AI01", 1, "A", "a", 1, 2], ["C1L1AI01", 2, "B", "b", 3, 4], ["C1L1AI01", 1, "C", "c", 1, 2]], [4]);
   const res = await readIoExcel(JSZip, data, "x.xlsx", fakeSet());
   assert.equal(res.mode, "yellow");
   assert.deepEqual(res.yellowRows, [4]);
@@ -75,7 +75,7 @@ test("more channels than the template draws: the template is drawn again with it
 });
 
 test("bad channel numbers and repeated tags are reported", async () => {
-  const data = await makeXlsx([HEAD, ["M", 1, "A", "a", 1, 2], ["M", 1, "B", "b", 3, 4], ["M", "x", "C", "c", 1, 2], ["N", 1, "A", "a", 1, 2]]);
+  const data = await makeXlsx([HEAD, ["C1L1AI01", 1, "A", "a", 1, 2], ["C1L1AI01", 1, "B", "b", 3, 4], ["C1L1AI01", "x", "C", "c", 1, 2], ["N", 1, "A", "a", 1, 2]]);
   const res = await readIoExcel(JSZip, data, "x.xlsx", fakeSet());
   const w = res.modules[0].warnings.join(" ");
   assert.match(w, /CHANNEL 1 is repeated \(row 2/);
@@ -87,4 +87,56 @@ test("channel numbers and IO types are read from the usual spellings", async () 
   const { parseChannel, canonType } = await import("../web/js/core/io_excel.js");
   assert.deepEqual([5, "05", "5.0", "CH5", "CH-05", "CHNL 5", "R1-S2-CH5", "", "A5", "5A"].map(parseChannel), [5, 5, 5, 5, 5, 5, 5, null, null, null]);
   assert.deepEqual(["AI", "A.I.", "AI HART", "Analog Input", "DI-24VDC", "DIGITAL OUTPUT", "RTD/TC", "HART"].map((t) => canonType(t)), ["AI", "AI", "AI", "AI", "DI", "DO", "RTD", ""]);
+});
+
+/** A set whose only AI template draws one channel per sheet. */
+function perChannelSet() {
+  const s = fakeSet(), t = s.templates.AI;
+  t.channels = [1]; t.perChannel = true; t.chlabels = [];
+  t.header.chlabel = { h: "C0", t: "CH1", x: 0, y: 0, s: 10, ha: 0, va: 0, prefix: "CH", pad: 0, w: 60 };
+  t.tags = [t.tags[0]]; t.descs = [t.descs[0]]; t.terms = [t.terms[0]];
+  return s;
+}
+
+test("one sheet per channel: a channel the workbook has no row for still gets its sheet, so no number is skipped", async () => {
+  const data = await makeXlsx([HEAD, ["C1L1AI01", 1, "A", "a", 1, 2], ["C1L1AI01", 2, "B", "b", 3, 4], ["C1L1AI01", 4, "D", "d", 7, 8]]);
+  const res = await readIoExcel(JSZip, data, "x.xlsx", perChannelSet());
+  const sh = res.modules[0].sheets;
+  assert.deepEqual(sh.map((s) => s.first), [1, 2, 3, 4]);
+  assert.deepEqual(sh.map((s) => s.texts.C0), ["CH1", "CH2", "CH3", "CH4"]);
+  assert.deepEqual(sh.map((s) => s.texts.G1), ["A", "B", "SPARE", "D"]);
+  assert.deepEqual([res.modules[0].used, res.modules[0].spare], [3, 1]);
+});
+
+test("one sheet per channel: a channel above the 16 a module usually has is drawn, not dropped", async () => {
+  const data = await makeXlsx([HEAD, ["C1L1AI01", 1, "A", "a", 1, 2], ["C1L1AI01", 20, "T", "t", 5, 6]]);
+  const res = await readIoExcel(JSZip, data, "x.xlsx", perChannelSet());
+  const sh = res.modules[0].sheets;
+  assert.equal(sh.length, 20);
+  assert.deepEqual([sh[0].first, sh[19].first], [1, 20]);
+  assert.equal(sh[19].texts.G1, "T");
+  assert.equal(res.modules[0].warnings.filter((w) => /skipped|outside/.test(w)).length, 0);
+});
+
+test("a template that draws its channel labels bottom up still fills and names its sheet by channel", async () => {
+  const set = fakeSet(), t = set.templates.AI;
+  t.channels = [2, 1]; // CH2 drawn above CH1
+  t.tags = [t.tags[0], t.tags[1]]; t.descs = [t.descs[0], t.descs[1]];
+  t.terms = [{ ...t.terms[0], ch: 2 }, { ...t.terms[1], ch: 1 }];
+  const data = await makeXlsx([HEAD, ["C1L1AI01", 1, "A", "a", 1, 2], ["C1L1AI01", 2, "B", "b", 3, 4]]);
+  const res = await readIoExcel(JSZip, data, "x.xlsx", set);
+  const s = res.modules[0].sheets[0];
+  assert.deepEqual([s.first, s.last], [1, 2]);
+  assert.deepEqual([s.texts.G1, s.texts.G2], ["B", "A"]); // tags[0] is the box of CH2
+  assert.deepEqual([s.texts.S1, s.texts.S2], ["3", "1"]);
+});
+
+test("the templates of a type that skip a channel range are reported instead of drawing the wrong channel", async () => {
+  const set = fakeSet();
+  set.templates.AI.channels = [1, 2];
+  set.templates.AI2 = { ...set.templates.AI, file: "AI2.dwg", channels: [5, 6] };
+  const data = await makeXlsx([HEAD, ["C1L1AI01", 1, "A", "a", 1, 2], ["C1L1AI01", 5, "E", "e", 9, 10]]);
+  const res = await readIoExcel(JSZip, data, "x.xlsx", set);
+  assert.ok(res.modules[0].warnings.some((w) => /not CH3, CH4/.test(w)), res.modules[0].warnings.join(" | "));
+  assert.deepEqual(res.modules[0].sheets.map((s) => [s.first, s.last]), [[1, 2], [5, 6]]);
 });
