@@ -104,13 +104,33 @@ export function channelOf(chs, t, band) {
  *  texts cannot be matched to the labels one by one they are left in the order they are drawn (and it is reported). */
 function perChannelTexts(chs, list, band, what, warn) {
   if (list.length !== chs.length) return list;
-  const idx = list.map((t) => channelOf(chs, t, band));
+  let idx = list.map((t) => channelOf(chs, t, band));
+  if (new Set(idx).size !== list.length) { // drawn half a row above / below the labels: match them again without that shift
+    const ys = (a) => a.map((t) => t.y).sort((p, q) => q - p), ly = ys(list), cy = ys(chs);
+    const shift = median(ly.map((y, i) => y - cy[i]));
+    idx = list.map((t) => channelOf(chs, { ...t, y: t.y - shift }, band));
+  }
   if (new Set(idx).size !== list.length) {
     warn.push(`the '${what}' texts do not sit one per channel label - they are filled in the order they are drawn`);
     return list;
   }
   const out = [];
   idx.forEach((i, k) => { out[i] = list[k]; });
+  return out;
+}
+
+/** Channel labels drawn in a form the reader does not use: a turned text, an MTEXT of several lines, a text inside a block. */
+function unreadLabels(doc) {
+  const out = [], has = (s) => new RegExp("(^|[^A-Z])" + CH_LABEL, "i").test(s);
+  for (const e of doc.msp) {
+    if (e.type === "TEXT" && Math.abs(e.num(50, 0)) >= 0.01 && reFull(CH_LABEL, strip(e.get(1, "")))) out.push(`'${strip(e.get(1, ""))}' turned by ${Math.round(e.num(50, 0))}°`);
+    else if (e.type === "MTEXT" && has(mtextPlainText(e)) && mtextPlainText(e).includes("\n")) out.push(`'${mtextPlainText(e).replace(/\n/g, " / ").slice(0, 30)}' (MTEXT of several lines)`);
+    else if (e.type === "INSERT") {
+      const b = doc.block(e.get(2, ""));
+      const t = b && b.ents.find((x) => (x.type === "TEXT" || x.type === "ATTDEF" || x.type === "ATTRIB") && has(x.get(1, "") + " " + x.get(2, "")));
+      if (t) out.push(`'${strip(t.get(1, "") || t.get(2, ""))}' inside block ${e.get(2, "")}`);
+    }
+  }
   return out;
 }
 
@@ -401,6 +421,15 @@ export function analyze(doc, tid, frameName, box, forceType = null) {
     throw new TemplateError(`${chs.length} channel labels but ${tags.length} 'FIELD TAG:' and ${descs.length} 'DESCRIPTION:' texts`);
   const channels = chs.map((c) => chNumber(strip(c.t)));
   const perChannel = channels.length === 1; // a sheet of one channel: the workbook gives one such sheet per channel
+  // A channel number missing between the lowest and the highest label (CH1-14, CH16): its label is drawn in a way that is not read
+  const missingChs = [];
+  for (let n = Math.min(...channels); n <= Math.max(...channels); n++) if (!channels.includes(n)) missingChs.push(n);
+  if (missingChs.length) {
+    const why = unreadLabels(doc);
+    warn.push(`channel label${missingChs.length > 1 ? "s" : ""} CH${missingChs.join(", CH")} not found between CH${Math.min(...channels)} and CH${Math.max(...channels)}` +
+      (why.length ? ` - drawn as ${why.slice(0, 4).join("; ")}: write ${missingChs.length > 1 ? "them" : "it"} as a plain one-line text like the other labels` : " - write it as a plain one-line text like the other labels") +
+      `. Those channels get no sheet from this template.`);
+  }
   // The channel labels are written on every sheet, so a template of CH1-8 also draws CH9-16 of a 16 channel module ('CH01' stays 2 digits)
   const chFormat = (c) => {
     const raw = strip(c.t), d = /(\d+)$/.exec(raw)[1];
@@ -583,7 +612,8 @@ export function assignIds(found) {
 }
 
 // ------------------------------------------------------------------------------------------------ preparing the drawing
-const FIELDLIKE = "(\\d+|TB\\s?\\d+|JB.{0,12}|[A-Z]*(TB|RTP)X{2,}|" + CH_LABEL + ")";
+const FIELDLIKE = "(\\d+|TB\\s?\\d+|JB.{0,12}|[A-Z]*(TB|RTP)X{2,}|" + CH_LABEL + "|" +
+  [...TAG_LABELS, ...DESC_LABELS].map((p) => "(?:" + p.replace(/\^/g, "") + ").*").join("|") + ")"; // a label of a channel, with or without its value
 const ATTACH = { 1: [0, 3], 2: [1, 3], 3: [2, 3], 4: [0, 2], 5: [1, 2], 6: [2, 2], 7: [0, 1], 8: [1, 1], 9: [2, 1] };
 
 /** Short single line MTEXTs that hold values ('TB1', a terminal number) become TEXT, so that they can be filled like any other text. */

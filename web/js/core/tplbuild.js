@@ -16,7 +16,7 @@ import {
   TemplateError, wingdingsToTick, CH_LABEL, TAG_LABELS,
 } from "./analyze.js";
 
-export const VERSION = 17; // raise when the analysis changes: sets built with an older version are rebuilt
+export const VERSION = 18; // raise when the analysis changes: sets built with an older version are rebuilt
 
 const stem = (n) => n.replace(/\.[^.]*$/, "");
 const allFields = (t) => [...Object.values(t.header), ...(t.jblines || []), ...(t.jbtags || []), ...(t.chlabels || []), ...t.tags, ...t.descs, ...t.terms];
