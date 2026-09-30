@@ -152,3 +152,18 @@ test("a repeated sheet goes on counting the template's terminal numbers when the
   assert.deepEqual([p2.texts.C1, p2.texts.C2, p2.texts.S1, p2.texts.S2], ["CH3", "CH4", "3", "4"]); // CH3-4: the column goes on
   assert.ok(res.warnings.some((w) => /go on counting/.test(w)));
 });
+
+test("one sheet per channel with 2-wire and 4-wire templates: the sheets run CH1, CH2, CH3 ... not 1, 3, 5 ... 2, 4, 6", async () => {
+  const set = perChannelSet(), t = set.templates.AI;
+  delete set.templates.AI;
+  set.templates.AI2W = { ...t, wire: "2 WIRE" };
+  set.templates.AI4W = { ...t, wire: "4 WIRE", file: "AI4W.dwg" };
+  const rows = [["MODULE NAME", "CHANNEL", "CHANNEL NAME", "DESCRIPTION", "SIGNAL TYPE"]];
+  for (let ch = 1; ch <= 16; ch++) rows.push(["C1L1AI01", ch, `T${ch}`, "d", ch % 2 === 0 || ch === 15 ? "4 WIRE" : "2 WIRE"]);
+  const res = await readIoExcel(JSZip, await makeXlsx(rows), "x.xlsx", set);
+  const sh = res.modules[0].sheets;
+  assert.deepEqual(sh.map((s) => s.first), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+  assert.deepEqual(sh.map((s) => s.texts.C0), sh.map((s) => `CH${s.first}`));
+  assert.deepEqual(sh.map((s) => s.texts.G1), sh.map((s) => `T${s.first}`)); // each sheet has its own channel's tag
+  assert.deepEqual([sh[13].template, sh[14].template, sh[15].template], ["AI4W", "AI4W", "AI4W"]); // CH14-16 are 4-wire
+});

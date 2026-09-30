@@ -760,7 +760,6 @@
   let book = null;              // /api/io result
   let lastFile = null;          // the workbook as last read, to read it again for another template set
   let sheets = [];              // flat list: { m, s, key, no, i }
-  const KEEP_BOOK_MAX_SHEETS = 3000;  // a bigger workbook is not saved in localStorage
   const LIST_MAX_SHEETS = 600;        // more shown sheets than this: the sidebar lists modules, and the sheets of the open one
   const LIST_MAX_MODULES = 400;       // ... at most this many modules (search / IO type tabs narrow the list)
   const TABLE_MAX_ROWS = 500;         // rows of the module table
@@ -786,9 +785,9 @@
   function save() {
     const cb = $("clearBtn");
     if (cb) cb.disabled = !(book || feed.length || Object.keys(edits).length || SETS.length);
-    // A big workbook (tens of MB) is not kept in the browser: it is read again from the linked / imported Excel file
-    const keep = sheets.length <= KEEP_BOOK_MAX_SHEETS;
-    try { localStorage.setItem(STORE, JSON.stringify({ book: keep ? book : null, edits, set: activeSet, key: sheets[cur] && sheets[cur].key, filter, feed: keep ? feed.slice(0, 40) : [], ui: ui })); } catch (e) {}
+    // The sheets are never kept in the browser: every time the page opens they are made again from the Excel file as it is now,
+    // so nothing old is shown. Only the file's name (to read it again), the text edits and the view are kept.
+    try { localStorage.setItem(STORE, JSON.stringify({ file: book ? book.file : "", edits, set: activeSet, key: sheets[cur] && sheets[cur].key, filter, feed: feed.slice(0, 40), ui: ui })); } catch (e) {}
   }
   function load() {
     try { return JSON.parse(localStorage.getItem(STORE) || "null"); } catch (e) { return null; }
@@ -2106,23 +2105,24 @@
     if (saved && saved.ui) ui = { ...ui, ...saved.ui };
     applyUI();
     setView(ui.view, false);
-    // The saved workbook belongs to the saved template set: use it only when that set is still the one in use
-    if (saved && saved.book && Array.isArray(saved.book.modules) && saved.set === activeSet && activeSet) {
-      book = saved.book; edits = saved.edits || {}; filter = saved.filter || "ALL"; feed = saved.feed || [];
-      buildSheets();
-    }
+    // Nothing of the last session is drawn: the Excel file of the last session (with the same template set) is read again below
+    const last = saved && saved.set === activeSet && activeSet ? saved.file || (saved.book && saved.book.file) || "" : "";
+    if (last) { edits = saved.edits || {}; filter = saved.filter || "ALL"; feed = saved.feed || []; }
     renderSource(); renderTabs(); renderFeed();
     const i = saved ? sheets.findIndex((x) => x.key === saved.key) : -1;
     show(i >= 0 ? i : 0, true);
 
-    // Reconnect to the Excel file of the last session and read it again, so what is shown is the file now
+    // Read the Excel file of the last session again, so what is shown is the file as it is now
     const handle = window.showOpenFilePicker ? await idb.get("handle") : null;
-    if (handle && book && handle.name === book.file) {
+    if (handle && last && handle.name === last) {
       let p = "prompt";
       try { p = await handle.queryPermission({ mode: "read" }); } catch (e) {}
       if (p === "granted") reconnect(handle);
-      else { pending = handle; setLive("wait", "Reconnect live", `Click to read ${handle.name} again and follow its saves (the browser asks once)`); }
-    } else if (book) setLive("wait", "Link Excel for live", "Pick the Excel file again to follow its saves");
+      else {
+        pending = handle; setLive("wait", "Reconnect live", `Click to read ${handle.name} again and follow its saves (the browser asks once)`);
+        toast(`Click “Reconnect live” to read ${last} again`, "", 8000);
+      }
+    } else if (last) toast(`Import ${last} again: the sheets are always made from the Excel file as it is now`, "", 8000);
   }
   init();
 })();
